@@ -1,8 +1,10 @@
 import React, { useState, useMemo } from 'react';
 import { 
   Package, Search, Plus, Minus, Edit, Trash2, 
-  AlertTriangle, DollarSign, TrendingUp, Layers, Check
+  AlertTriangle, DollarSign, TrendingUp, Layers, Check,
+  Truck, PackagePlus, CheckCircle2, RotateCcw, X
 } from 'lucide-react';
+import confetti from 'canvas-confetti';
 import { CATEGORIES } from '../data/initialProducts';
 import { formatCOP } from '../data/store';
 import ConfirmModal from './ConfirmModal';
@@ -12,6 +14,7 @@ export default function Inventory({
   onAddProduct, 
   onUpdateProduct, 
   onUpdateStock, 
+  onBulkRestock,
   onDeleteProduct,
   activeAdmin 
 }) {
@@ -21,6 +24,13 @@ export default function Inventory({
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null); // reemplaza window.confirm()
+
+  // Estado para Entrada de Pedido / Reabastecimiento Rápido
+  const [isRestockModalOpen, setIsRestockModalOpen] = useState(false);
+  const [restockQuantities, setRestockQuantities] = useState({});
+  const [restockSearch, setRestockSearch] = useState('');
+  const [restockCategory, setRestockCategory] = useState('Todos');
+  const [isSavingRestock, setIsSavingRestock] = useState(false);
 
   // Form State
   const [formName, setFormName] = useState('');
@@ -112,6 +122,67 @@ export default function Inventory({
     }
 
     setIsAddModalOpen(false);
+  };
+
+  // Restock handlers
+  const handleRestockQtyChange = (id, val) => {
+    const numVal = val === '' ? '' : Math.max(0, parseInt(val, 10) || 0);
+    setRestockQuantities(prev => ({ ...prev, [id]: numVal }));
+  };
+
+  const handleQuickAddRestock = (id, delta) => {
+    setRestockQuantities(prev => {
+      const current = parseInt(prev[id], 10) || 0;
+      return { ...prev, [id]: current + delta };
+    });
+  };
+
+  const handleClearRestock = () => {
+    setRestockQuantities({});
+  };
+
+  // Filtered products for restock modal
+  const restockFilteredProducts = useMemo(() => {
+    return products.filter(p => {
+      const matchSearch = p.name.toLowerCase().includes(restockSearch.toLowerCase());
+      const matchCat = restockCategory === 'Todos' || p.category === restockCategory;
+      return matchSearch && matchCat;
+    });
+  }, [products, restockSearch, restockCategory]);
+
+  const restockSummary = useMemo(() => {
+    let totalItems = 0;
+    let totalUnits = 0;
+    Object.entries(restockQuantities).forEach(([_, qty]) => {
+      const q = parseInt(qty, 10) || 0;
+      if (q > 0) {
+        totalItems += 1;
+        totalUnits += q;
+      }
+    });
+    return { totalItems, totalUnits };
+  }, [restockQuantities]);
+
+  const handleConfirmRestock = async () => {
+    const items = Object.entries(restockQuantities)
+      .map(([id, qty]) => ({ id, addQty: parseInt(qty, 10) || 0 }))
+      .filter(it => it.addQty > 0);
+
+    if (items.length === 0) return;
+
+    setIsSavingRestock(true);
+    try {
+      await onBulkRestock(items);
+      try {
+        confetti({ particleCount: 60, spread: 70, origin: { y: 0.7 } });
+      } catch (e) {}
+      setIsRestockModalOpen(false);
+      setRestockQuantities({});
+    } catch (err) {
+      console.error('Error al guardar reabastecimiento:', err);
+    } finally {
+      setIsSavingRestock(false);
+    }
   };
 
   return (
@@ -206,10 +277,27 @@ export default function Inventory({
           </select>
         </div>
 
-        <button className="btn btn-primary" onClick={handleOpenAdd}>
-          <Plus size={18} />
-          Nuevo Producto
-        </button>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button 
+            className="btn btn-success" 
+            onClick={() => {
+              setRestockQuantities({});
+              setRestockSearch('');
+              setRestockCategory('Todos');
+              setIsRestockModalOpen(true);
+            }}
+            title="Ingresar pedido completo de la distribuidora"
+            style={{ background: '#16a34a', color: '#ffffff', display: 'flex', alignItems: 'center', gap: '8px' }}
+          >
+            <Truck size={18} />
+            <span>Entrada de Pedido</span>
+          </button>
+
+          <button className="btn btn-primary" onClick={handleOpenAdd}>
+            <Plus size={18} />
+            Nuevo Producto
+          </button>
+        </div>
       </div>
 
       {/* Inventory Table / Grid */}
@@ -519,6 +607,274 @@ export default function Inventory({
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL: ENTRADA DE PEDIDO / REABASTECIMIENTO RÁPIDO */}
+      {isRestockModalOpen && (
+        <div 
+          className="modal-overlay" 
+          onClick={() => { if (!isSavingRestock) setIsRestockModalOpen(false); }}
+          style={{ zIndex: 1050 }}
+        >
+          <div 
+            className="modal-content" 
+            style={{ 
+              maxWidth: '820px', 
+              maxHeight: '90vh', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              padding: '24px',
+              overflow: 'hidden'
+            }} 
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px', flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <div style={{ 
+                  width: '46px', 
+                  height: '46px', 
+                  borderRadius: '12px', 
+                  background: '#dcfce7', 
+                  color: '#16a34a', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <Truck size={26} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+                    Entrada de Pedido / Reabastecimiento Rápido
+                  </h3>
+                  <p style={{ fontSize: '0.82rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                    Ingresa las cantidades que llegaron de la distribuidora para actualizar el stock de golpe.
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { if (!isSavingRestock) setIsRestockModalOpen(false); }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
+                aria-label="Cerrar modal"
+              >
+                <X size={22} />
+              </button>
+            </div>
+
+            {/* Filter Bar inside Modal */}
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '14px', flexShrink: 0 }}>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <Search size={16} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
+                <input 
+                  type="text"
+                  placeholder="Buscar en el pedido (ej. papas, galletas, jugo)..."
+                  className="input"
+                  style={{ paddingLeft: '36px', fontSize: '0.9rem' }}
+                  value={restockSearch}
+                  onChange={(e) => setRestockSearch(e.target.value)}
+                />
+              </div>
+
+              <select 
+                className="select" 
+                style={{ width: 'auto', fontSize: '0.88rem' }}
+                value={restockCategory}
+                onChange={(e) => setRestockCategory(e.target.value)}
+              >
+                {CATEGORIES.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Products List for Restock */}
+            <div style={{ 
+              flex: 1, 
+              overflowY: 'auto', 
+              paddingRight: '4px', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: '10px',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-md)',
+              padding: '12px',
+              background: '#f8fafc'
+            }}>
+              {restockFilteredProducts.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '36px 12px', color: 'var(--text-muted)' }}>
+                  No se encontraron productos que coincidan con la búsqueda.
+                </div>
+              ) : (
+                restockFilteredProducts.map(p => {
+                  const qtyEntered = parseInt(restockQuantities[p.id], 10) || 0;
+                  const newStock = p.stock + qtyEntered;
+
+                  return (
+                    <div 
+                      key={p.id}
+                      style={{
+                        background: qtyEntered > 0 ? '#f0fdf4' : '#ffffff',
+                        border: qtyEntered > 0 ? '1.5px solid #86efac' : '1px solid var(--border-subtle)',
+                        borderRadius: 'var(--radius-md)',
+                        padding: '10px 14px',
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: '12px',
+                        transition: 'all 0.15s ease'
+                      }}
+                    >
+                      {/* Left: Product Info */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '220px', flex: '1 1 auto' }}>
+                        <span style={{ fontSize: '1.6rem' }}>{p.icon || '📦'}</span>
+                        <div>
+                          <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-main)' }}>
+                            {p.name}
+                          </div>
+                          <div style={{ fontSize: '0.76rem', color: 'var(--text-dim)', display: 'flex', gap: '8px', alignItems: 'center', marginTop: '2px' }}>
+                            <span>{p.category}</span>
+                            <span>•</span>
+                            <span>Stock actual: <strong>{p.stock}</strong></span>
+                            {p.stock <= (p.minStock || 3) && (
+                              <span style={{ color: '#dc2626', fontWeight: 700 }}>⚠️ Bajo</span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Right: Quick Chips & Number Input */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+                        {/* Quick increment chips */}
+                        <div style={{ display: 'flex', gap: '4px' }}>
+                          {[6, 12, 24, 30].map(val => (
+                            <button
+                              key={val}
+                              type="button"
+                              onClick={() => handleQuickAddRestock(p.id, val)}
+                              style={{
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                border: '1px solid #cbd5e1',
+                                background: '#f1f5f9',
+                                color: '#0f172a',
+                                fontSize: '0.74rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                transition: 'background 0.15s ease'
+                              }}
+                              title={`Sumar ${val} unidades`}
+                            >
+                              +{val}
+                            </button>
+                          ))}
+                        </div>
+
+                        {/* Direct input */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <span style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text-muted)' }}>+</span>
+                          <input 
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            className="input"
+                            style={{
+                              width: '75px',
+                              textAlign: 'center',
+                              fontWeight: 800,
+                              fontSize: '0.95rem',
+                              padding: '6px 8px',
+                              borderColor: qtyEntered > 0 ? '#16a34a' : '#cbd5e1',
+                              background: qtyEntered > 0 ? '#ffffff' : '#f8fafc'
+                            }}
+                            value={restockQuantities[p.id] ?? ''}
+                            onChange={(e) => handleRestockQtyChange(p.id, e.target.value)}
+                          />
+                        </div>
+
+                        {/* Resulting Stock Indicator */}
+                        {qtyEntered > 0 && (
+                          <div style={{
+                            background: '#dcfce7',
+                            color: '#15803d',
+                            padding: '4px 8px',
+                            borderRadius: '6px',
+                            fontSize: '0.78rem',
+                            fontWeight: 800,
+                            whiteSpace: 'nowrap'
+                          }}>
+                            Quedará: {newStock}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Footer Summary & Action Buttons */}
+            <div style={{ 
+              display: 'flex', 
+              flexWrap: 'wrap',
+              justifyContent: 'space-between', 
+              alignItems: 'center', 
+              marginTop: '16px', 
+              paddingTop: '12px',
+              borderTop: '1px solid var(--border-subtle)',
+              gap: '12px',
+              flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ 
+                  background: restockSummary.totalUnits > 0 ? '#dcfce7' : '#f1f5f9',
+                  color: restockSummary.totalUnits > 0 ? '#15803d' : 'var(--text-muted)',
+                  padding: '6px 14px',
+                  borderRadius: '999px',
+                  fontWeight: 800,
+                  fontSize: '0.85rem'
+                }}>
+                  {restockSummary.totalUnits > 0 
+                    ? `📦 ${restockSummary.totalItems} productos · ${restockSummary.totalUnits} unidades a ingresar` 
+                    : 'Ingresa cantidades para sumar al stock'}
+                </div>
+
+                {restockSummary.totalUnits > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleClearRestock}
+                    style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.78rem', cursor: 'pointer', textDecoration: 'underline' }}
+                  >
+                    Limpiar todo
+                  </button>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary"
+                  disabled={isSavingRestock}
+                  onClick={() => setIsRestockModalOpen(false)}
+                >
+                  Cancelar
+                </button>
+
+                <button 
+                  type="button" 
+                  className="btn btn-success"
+                  disabled={restockSummary.totalUnits === 0 || isSavingRestock}
+                  onClick={handleConfirmRestock}
+                  style={{ display: 'flex', alignItems: 'center', gap: '8px', background: '#16a34a', color: '#fff' }}
+                >
+                  <CheckCircle2 size={18} />
+                  {isSavingRestock ? 'Guardando entrada…' : `Confirmar Entrada (+${restockSummary.totalUnits} unid.)`}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

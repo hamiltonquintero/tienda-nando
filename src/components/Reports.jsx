@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   BarChart3, Calendar, DollarSign, TrendingUp, Archive, 
   Printer, ArrowUpRight, ArrowDownLeft, CheckCircle2, 
-  Receipt, ShoppingBag, Clock, ShieldCheck
+  Receipt, ShoppingBag, Clock, ShieldCheck, RotateCcw, AlertTriangle, X
 } from 'lucide-react';
 import { formatCOP } from '../data/store';
 
@@ -12,11 +12,19 @@ export default function Reports({
   currentPeriod, 
   archivedPeriods, 
   onClosePeriod,
+  onCancelSale,
   activeAdmin 
 }) {
   const [selectedPeriodId, setSelectedPeriodId] = useState(currentPeriod.id);
   const [filterType, setFilterType] = useState('all'); // 'all' | 'contado' | 'fiado'
   const [isCloseModalOpen, setIsCloseModalOpen] = useState(false);
+
+  // Estado para Anulación de Venta con PIN
+  const [cancellingSale, setCancellingSale] = useState(null);
+  const [cancelPin, setCancelPin] = useState('');
+  const [cancelPinError, setCancelPinError] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
+  const [cancelSuccessToast, setCancelSuccessToast] = useState('');
 
   const isCurrentPeriod = selectedPeriodId === currentPeriod.id;
 
@@ -87,6 +95,32 @@ export default function Reports({
     if (filterType === 'fiado') return timelineEvents.filter(e => e.eventType === 'sale' && e.type === 'fiado');
     return timelineEvents;
   }, [timelineEvents, filterType]);
+
+  const handleExecuteCancelSale = async (e) => {
+    e.preventDefault();
+    if (!cancellingSale || !onCancelSale) return;
+
+    if (cancelPin !== (activeAdmin?.pin || '1234')) {
+      setCancelPinError('PIN incorrecto. Intenta de nuevo.');
+      return;
+    }
+
+    setIsCancelling(true);
+    setCancelPinError('');
+    try {
+      await onCancelSale(cancellingSale.id);
+      const totalCancelled = cancellingSale.total;
+      setCancellingSale(null);
+      setCancelPin('');
+      setCancelSuccessToast(`Venta de ${formatCOP(totalCancelled)} anulada. Stock repuesto correctamente.`);
+      setTimeout(() => setCancelSuccessToast(''), 4500);
+    } catch (err) {
+      console.error('Error al anular venta:', err);
+      setCancelPinError('Error al anular la venta. Intenta nuevamente.');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
 
   const handleConfirmClosePeriod = () => {
     onClosePeriod();
@@ -306,6 +340,7 @@ export default function Reports({
                 <th style={{ padding: '12px 16px' }}>Detalle / Compañero</th>
                 <th style={{ padding: '12px 16px' }}>Atendido Por</th>
                 <th style={{ padding: '12px 16px', textAlign: 'right' }}>Monto</th>
+                <th style={{ padding: '12px 16px', textAlign: 'center' }}>Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -350,13 +385,46 @@ export default function Reports({
                     <td style={{ padding: '12px 16px', textAlign: 'right', fontWeight: 800, color: isPayment ? '#16a34a' : isCredit ? '#ea580c' : 'var(--brand-blue)' }}>
                       {isPayment ? `+${formatCOP(item.amount)}` : formatCOP(item.total)}
                     </td>
+
+                    <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                      {!isPayment && isCurrentPeriod && onCancelSale ? (
+                        <button
+                          type="button"
+                          className="btn-ghost"
+                          style={{
+                            padding: '5px 10px',
+                            color: '#dc2626',
+                            borderRadius: 'var(--radius-sm)',
+                            border: '1px solid #fee2e2',
+                            background: '#fff5f5',
+                            fontSize: '0.78rem',
+                            fontWeight: 700,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            cursor: 'pointer'
+                          }}
+                          title="Anular venta accidental y reponer stock"
+                          onClick={() => {
+                            setCancellingSale(item);
+                            setCancelPin('');
+                            setCancelPinError('');
+                          }}
+                        >
+                          <RotateCcw size={13} />
+                          <span>Anular</span>
+                        </button>
+                      ) : (
+                        <span style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>—</span>
+                      )}
+                    </td>
                   </tr>
                 );
               })}
 
               {filteredTimeline.length === 0 && (
                 <tr>
-                  <td colSpan={5} style={{ padding: '30px', textAlign: 'center', color: 'var(--text-dim)' }}>
+                  <td colSpan={6} style={{ padding: '30px', textAlign: 'center', color: 'var(--text-dim)' }}>
                     No hay transacciones que coincidan con el filtro.
                   </td>
                 </tr>
@@ -365,6 +433,185 @@ export default function Reports({
           </table>
         </div>
       </div>
+
+      {/* MODAL: ANULACIÓN DE VENTA CON CONFIRMACIÓN DE PIN */}
+      {cancellingSale && (
+        <div 
+          className="modal-overlay" 
+          onClick={() => { if (!isCancelling) setCancellingSale(null); }}
+          style={{ zIndex: 1100 }}
+        >
+          <div 
+            className="modal-content" 
+            style={{ maxWidth: '440px', padding: '24px' }} 
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ 
+                  width: '42px', 
+                  height: '42px', 
+                  borderRadius: '12px', 
+                  background: '#fee2e2', 
+                  color: '#dc2626', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <RotateCcw size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+                    ¿Anular esta Venta?
+                  </h3>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                    Esta acción revertirá los cambios en el sistema.
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { if (!isCancelling) setCancellingSale(null); }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
+                aria-label="Cerrar"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Resumen de la venta */}
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-md)',
+              padding: '12px 14px',
+              fontSize: '0.84rem',
+              marginBottom: '14px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ color: 'var(--text-dim)' }}>Total de la venta:</span>
+                <strong style={{ fontSize: '1.05rem', color: cancellingSale.type === 'fiado' ? '#ea580c' : 'var(--brand-blue)' }}>
+                  {formatCOP(cancellingSale.total)}
+                </strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ color: 'var(--text-dim)' }}>Tipo:</span>
+                <span style={{ fontWeight: 700 }}>
+                  {cancellingSale.type === 'fiado' 
+                    ? `Fiado (${cancellingSale.customerName})` 
+                    : `Contado (${cancellingSale.paymentMethod})`}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-dim)' }}>Hora:</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                  {new Date(cancellingSale.date).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            </div>
+
+            {/* Efectos de la anulación */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', fontSize: '0.82rem' }}>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 'var(--radius-sm)', padding: '10px 12px', color: '#15803d' }}>
+                <strong>🟢 Reposición de Stock Automática:</strong>
+                <div style={{ marginTop: '4px', fontSize: '0.78rem' }}>
+                  {cancellingSale.items.map(it => `+${it.quantity} ${it.name}`).join(' • ')}
+                </div>
+              </div>
+
+              {cancellingSale.type === 'fiado' && cancellingSale.customerName && (
+                <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 'var(--radius-sm)', padding: '10px 12px', color: '#c2410c' }}>
+                  <strong>🟠 Descuento de Deuda:</strong>
+                  <div style={{ marginTop: '2px', fontSize: '0.78rem' }}>
+                    Se descontarán <strong>{formatCOP(cancellingSale.total)}</strong> del saldo deudor de <strong>{cancellingSale.customerName}</strong>.
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Formulario con confirmación de PIN */}
+            <form onSubmit={handleExecuteCancelSale}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                  Ingresa tu PIN de Administrador ({activeAdmin?.name}):
+                </label>
+                <input 
+                  type="password"
+                  maxLength={6}
+                  required
+                  autoFocus
+                  placeholder="PIN de 4 dígitos"
+                  className="input"
+                  style={{
+                    textAlign: 'center',
+                    fontSize: '1.4rem',
+                    letterSpacing: '0.3em',
+                    fontWeight: 800,
+                    padding: '8px'
+                  }}
+                  value={cancelPin}
+                  onChange={(e) => {
+                    setCancelPin(e.target.value);
+                    setCancelPinError('');
+                  }}
+                />
+                {cancelPinError && (
+                  <div style={{ color: '#ef4444', fontSize: '0.78rem', fontWeight: 700, marginTop: '6px', textAlign: 'center' }}>
+                    ⚠️ {cancelPinError}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  style={{ flex: 1 }}
+                  disabled={isCancelling}
+                  onClick={() => setCancellingSale(null)}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn" 
+                  style={{ flex: 1, background: '#dc2626', color: '#fff', fontWeight: 700 }}
+                  disabled={isCancelling || !cancelPin}
+                >
+                  {isCancelling ? 'Anulando…' : 'Confirmar Anulación'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* TOAST FEEDBACK DE ANULACIÓN */}
+      {cancelSuccessToast && (
+        <div style={{
+          position: 'fixed',
+          bottom: '24px',
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(15, 23, 42, 0.95)',
+          border: '1px solid #10b981',
+          backdropFilter: 'blur(12px)',
+          borderRadius: 'var(--radius-xl)',
+          padding: '12px 24px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          boxShadow: '0 10px 30px rgba(0, 0, 0, 0.5)',
+          zIndex: 1200,
+          color: '#ffffff',
+          fontWeight: 700,
+          fontSize: '0.88rem'
+        }}>
+          <CheckCircle2 size={20} color="#10b981" />
+          <span>{cancelSuccessToast}</span>
+        </div>
+      )}
 
       {/* CLOSE QUINCENA CONFIRMATION MODAL */}
       {isCloseModalOpen && (

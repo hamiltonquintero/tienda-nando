@@ -154,6 +154,7 @@ export default function App() {
             onUpdateCustomer={store.updateCustomer}
             onDeleteCustomer={store.deleteCustomer}
             onFiarToCustomer={handleFiarToCustomer}
+            onCancelSale={store.cancelSale}
             activeAdmin={store.activeAdmin}
           />
         )}
@@ -164,6 +165,7 @@ export default function App() {
             onAddProduct={store.addProduct}
             onUpdateProduct={store.updateProduct}
             onUpdateStock={store.updateStock}
+            onBulkRestock={store.bulkRestockProducts}
             onDeleteProduct={store.deleteProduct}
             activeAdmin={store.activeAdmin}
           />
@@ -176,6 +178,7 @@ export default function App() {
             currentPeriod={store.currentPeriod}
             archivedPeriods={store.archivedPeriods}
             onClosePeriod={store.closeCurrentPeriod}
+            onCancelSale={store.cancelSale}
             activeAdmin={store.activeAdmin}
           />
         )}

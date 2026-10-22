@@ -1,7 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { 
   Search, ShoppingCart, Trash2, Plus, Minus, CheckCircle, 
-  UserPlus, User, CreditCard, DollarSign, AlertTriangle, Sparkles
+  UserPlus, User, CreditCard, DollarSign, AlertTriangle, Sparkles,
+  MessageSquare, Copy, Check, CheckCircle2, X, Send, Share2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { CATEGORIES } from '../data/initialProducts';
@@ -42,6 +43,12 @@ export default function POS({
   const [showMobileCart, setShowMobileCart] = useState(false);
   const [successToast, setSuccessToast] = useState(null);
   const [fiadoError, setFiadoError] = useState(false); // reemplaza el alert()
+
+  // Estado para el Recibo Digital por WhatsApp
+  const [lastCompletedSale, setLastCompletedSale] = useState(null);
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
+  const [receiptCustomPhone, setReceiptCustomPhone] = useState('');
+  const [copiedReceipt, setCopiedReceipt] = useState(false);
 
   // Filter products
   const filteredProducts = useMemo(() => {
@@ -97,6 +104,54 @@ export default function POS({
     return cart.reduce((sum, item) => sum + item.quantity, 0);
   }, [cart]);
 
+  // Generar texto para el Ticket / Recibo de WhatsApp según la especificación:
+  // "Hola Hamilton, compraste: 1 Tosh ($1.400) + 1 Coca Cola ($2.500). Total: $3.900 (Fiado a quincena). ¡Gracias!"
+  const generateReceiptWhatsAppMessage = (saleData) => {
+    if (!saleData) return '';
+    const namePart = saleData.customerName 
+      ? `Hola ${saleData.customerName.split(' ')[0]}` 
+      : 'Hola';
+    
+    const itemsText = saleData.items
+      .map(it => `${it.quantity} ${it.name} (${formatCOP(it.price * it.quantity)})`)
+      .join(' + ');
+
+    let paymentDesc = 'De Contado';
+    if (saleData.saleType === 'fiado') {
+      paymentDesc = 'Fiado a quincena';
+    } else if (saleData.paymentMethod === 'nequi') {
+      paymentDesc = 'Contado por Nequi';
+    } else if (saleData.paymentMethod === 'daviplata') {
+      paymentDesc = 'Contado por Daviplata';
+    } else if (saleData.paymentMethod === 'efectivo') {
+      paymentDesc = 'Contado en efectivo';
+    }
+
+    return `${namePart}, compraste: ${itemsText}. Total: ${formatCOP(saleData.total)} (${paymentDesc}). ¡Gracias! 🙌\n\n— Surtimueve Más (${saleData.adminName})`;
+  };
+
+  const handleSendWhatsAppReceipt = (customPhone = '') => {
+    if (!lastCompletedSale) return;
+    const text = encodeURIComponent(generateReceiptWhatsAppMessage(lastCompletedSale));
+    const phoneToUse = (customPhone || lastCompletedSale.phone || '').replace(/\D/g, '');
+    let url = '';
+    if (phoneToUse.length >= 10) {
+      const fullPhone = phoneToUse.startsWith('57') ? phoneToUse : `57${phoneToUse}`;
+      url = `https://wa.me/${fullPhone}?text=${text}`;
+    } else {
+      url = `https://wa.me/?text=${text}`;
+    }
+    window.open(url, '_blank');
+  };
+
+  const handleCopyReceipt = () => {
+    if (!lastCompletedSale) return;
+    const text = generateReceiptWhatsAppMessage(lastCompletedSale);
+    navigator.clipboard.writeText(text);
+    setCopiedReceipt(true);
+    setTimeout(() => setCopiedReceipt(false), 2500);
+  };
+
   // Handle Complete Sale
   const handleCheckout = async () => {
     if (cart.length === 0 || isCheckingOut) return;
@@ -107,6 +162,27 @@ export default function POS({
     }
 
     const customer = customers.find(c => c.id === selectedCustomerId);
+    const saleItemsSnapshot = cart.map(i => ({
+      id: i.id,
+      name: i.name,
+      price: i.price,
+      cost: i.cost,
+      quantity: i.quantity,
+      total: i.price * i.quantity
+    }));
+
+    const saleSnapshot = {
+      total: cartTotal,
+      saleType,
+      paymentMethod: saleType === 'contado' ? paymentMethod : 'credito',
+      customer: customer ? { ...customer } : null,
+      customerName: customer ? customer.name : '',
+      phone: customer ? (customer.phone || '') : '',
+      items: saleItemsSnapshot,
+      date: new Date().toISOString(),
+      adminName: activeAdmin ? activeAdmin.name : 'Administrador'
+    };
+
     setIsCheckingOut(true);
     setCheckoutError('');
 
@@ -115,14 +191,7 @@ export default function POS({
         type: saleType,
         customerId: customer ? customer.id : null,
         customerName: customer ? customer.name : null,
-        items: cart.map(i => ({
-          id: i.id,
-          name: i.name,
-          price: i.price,
-          cost: i.cost,
-          quantity: i.quantity,
-          total: i.price * i.quantity
-        })),
+        items: saleItemsSnapshot,
         total: cartTotal,
         paymentMethod: saleType === 'contado' ? paymentMethod : 'credito'
       });
@@ -138,13 +207,10 @@ export default function POS({
         // ignore
       }
 
-      // Success toast
-      setSuccessToast({
-        total: cartTotal,
-        type: saleType,
-        customer: customer ? customer.name : null
-      });
-      setTimeout(() => setSuccessToast(null), 4000);
+      // Guardar para el modal de Recibo por WhatsApp
+      setLastCompletedSale(saleSnapshot);
+      setReceiptCustomPhone(customer?.phone || '');
+      setIsReceiptModalOpen(true);
 
       // Reset cart and selection
       clearCart();
@@ -754,6 +820,177 @@ export default function POS({
         onConfirm={() => setFiadoError(false)}
         onCancel={() => setFiadoError(false)}
       />
+
+      {/* MODAL: TICKET / RECIBO DIGITAL POR WHATSAPP */}
+      {isReceiptModalOpen && lastCompletedSale && (
+        <div 
+          className="modal-overlay" 
+          onClick={() => setIsReceiptModalOpen(false)}
+          style={{ zIndex: 1100 }}
+        >
+          <div 
+            className="modal-content" 
+            style={{ maxWidth: '440px', padding: '24px' }} 
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ 
+                  width: '42px', 
+                  height: '42px', 
+                  borderRadius: '50%', 
+                  background: '#dcfce7', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  color: '#16a34a',
+                  flexShrink: 0
+                }}>
+                  <CheckCircle2 size={24} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+                    ¡Venta Registrada!
+                  </h3>
+                  <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', margin: 0 }}>
+                    {lastCompletedSale.customerName 
+                      ? `Cliente: ${lastCompletedSale.customerName}` 
+                      : 'Venta de mostrador rápida'}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setIsReceiptModalOpen(false)}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
+                aria-label="Cerrar"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Total Highlight */}
+            <div style={{
+              background: lastCompletedSale.saleType === 'fiado' ? '#fff7ed' : '#f0fdf4',
+              border: lastCompletedSale.saleType === 'fiado' ? '1.5px solid #fdba74' : '1.5px solid #86efac',
+              borderRadius: 'var(--radius-md)',
+              padding: '12px 16px',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '14px'
+            }}>
+              <div>
+                <span style={{ fontSize: '0.74rem', textTransform: 'uppercase', fontWeight: 800, color: lastCompletedSale.saleType === 'fiado' ? '#c2410c' : '#15803d', letterSpacing: '0.04em' }}>
+                  {lastCompletedSale.saleType === 'fiado' ? 'Fiado a Quincena' : `Contado (${lastCompletedSale.paymentMethod})`}
+                </span>
+                <div style={{ fontSize: '1.5rem', fontWeight: 900, color: lastCompletedSale.saleType === 'fiado' ? '#ea580c' : '#16a34a' }}>
+                  {formatCOP(lastCompletedSale.total)}
+                </div>
+              </div>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-dim)', textAlign: 'right' }}>
+                {lastCompletedSale.items.reduce((acc, it) => acc + it.quantity, 0)} ítems
+              </span>
+            </div>
+
+            {/* Preview del Mensaje de WhatsApp (Burbuja de Chat) */}
+            <div style={{ marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <label style={{ fontSize: '0.76rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                  <MessageSquare size={13} color="#25D366" />
+                  Ticket para enviar al compañero:
+                </label>
+                <button
+                  type="button"
+                  onClick={handleCopyReceipt}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: copiedReceipt ? '#16a34a' : 'var(--brand-blue)',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  {copiedReceipt ? <Check size={12} /> : <Copy size={12} />}
+                  {copiedReceipt ? '¡Copiado!' : 'Copiar texto'}
+                </button>
+              </div>
+
+              <div style={{
+                background: '#f1f5f9',
+                border: '1px solid #cbd5e1',
+                borderRadius: 'var(--radius-md)',
+                padding: '12px 14px',
+                fontSize: '0.84rem',
+                lineHeight: 1.5,
+                color: '#0f172a',
+                fontFamily: 'inherit',
+                position: 'relative'
+              }}>
+                <div style={{ fontStyle: 'italic', color: '#1e293b' }}>
+                  "{generateReceiptWhatsAppMessage(lastCompletedSale)}"
+                </div>
+              </div>
+            </div>
+
+            {/* Teléfono de destino (editable si el cliente no tenía o si desea cambiarlo) */}
+            <div style={{ marginBottom: '18px' }}>
+              <label style={{ fontSize: '0.76rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '4px' }}>
+                Enviar al número (opcional si ya lo tienes en tus contactos):
+              </label>
+              <input 
+                type="tel"
+                className="input"
+                placeholder="ej. 3001234567 o déjalo vacío para elegir chat"
+                value={receiptCustomPhone}
+                onChange={(e) => setReceiptCustomPhone(e.target.value)}
+                style={{ fontSize: '0.88rem', padding: '8px 12px' }}
+              />
+            </div>
+
+            {/* Botones de acción */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <button 
+                type="button"
+                className="btn"
+                onClick={() => handleSendWhatsAppReceipt(receiptCustomPhone)}
+                style={{
+                  width: '100%',
+                  background: '#25D366',
+                  color: '#ffffff',
+                  fontWeight: 800,
+                  fontSize: '0.98rem',
+                  padding: '12px',
+                  borderRadius: 'var(--radius-md)',
+                  boxShadow: '0 4px 14px rgba(37, 211, 102, 0.4)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  border: 'none',
+                  cursor: 'pointer'
+                }}
+              >
+                <MessageSquare size={18} />
+                Enviar Recibo por WhatsApp
+              </button>
+
+              <button 
+                type="button"
+                className="btn btn-secondary"
+                onClick={() => setIsReceiptModalOpen(false)}
+                style={{ width: '100%', padding: '10px' }}
+              >
+                Listo / Nueva Venta
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* SUCCESS TOAST NOTIFICATION */}
       {successToast && (

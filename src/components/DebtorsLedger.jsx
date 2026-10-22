@@ -3,7 +3,7 @@ import {
   Users, Search, UserPlus, DollarSign, MessageSquare, 
   Receipt, ArrowRight, CheckCircle2, AlertCircle, Phone, 
   Sparkles, History, Calendar, Trash2, Pencil, ShoppingCart,
-  Table as TableIcon, LayoutGrid
+  Table as TableIcon, LayoutGrid, RotateCcw, X
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { formatCOP } from '../data/store';
@@ -19,6 +19,7 @@ export default function DebtorsLedger({
   onUpdateCustomer,
   onDeleteCustomer,
   onFiarToCustomer,
+  onCancelSale,
   activeAdmin
 }) {
   const [search, setSearch] = useState('');
@@ -42,6 +43,41 @@ export default function DebtorsLedger({
   // Delete Customer State
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Anulación de venta con PIN
+  const [cancellingSale, setCancellingSale] = useState(null);
+  const [cancelPin, setCancelPin] = useState('');
+  const [cancelPinError, setCancelPinError] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
+
+  const handleExecuteCancelSale = async (e) => {
+    e.preventDefault();
+    if (!cancellingSale || !onCancelSale) return;
+
+    if (cancelPin !== (activeAdmin?.pin || '1234')) {
+      setCancelPinError('PIN incorrecto. Intenta de nuevo.');
+      return;
+    }
+
+    setIsCancelling(true);
+    setCancelPinError('');
+    try {
+      await onCancelSale(cancellingSale.id);
+      if (selectedCustomer && selectedCustomer.id === cancellingSale.customerId) {
+        setSelectedCustomer(prev => prev ? {
+          ...prev,
+          totalDebt: Math.max(0, (prev.totalDebt || 0) - Number(cancellingSale.total))
+        } : null);
+      }
+      setCancellingSale(null);
+      setCancelPin('');
+    } catch (err) {
+      console.error('Error al anular venta:', err);
+      setCancelPinError('Error al anular la venta. Intenta nuevamente.');
+    } finally {
+      setIsCancelling(false);
+    }
+  };
 
   // Total KPIs
   const totalPendingDebt = useMemo(() => {
@@ -852,8 +888,38 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
                       <div style={{ color: 'var(--text-main)', fontWeight: 500 }}>
                         {sale.items.map(it => `${it.name} (x${it.quantity})`).join(', ')}
                       </div>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginTop: '2px' }}>
-                        Registrado por: {sale.adminName}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)' }}>
+                          Registrado por: {sale.adminName}
+                        </div>
+                        {onCancelSale && (
+                          <button
+                            type="button"
+                            className="btn-ghost"
+                            style={{
+                              padding: '2px 8px',
+                              color: '#dc2626',
+                              border: '1px solid #fee2e2',
+                              background: '#fff5f5',
+                              borderRadius: '6px',
+                              fontSize: '0.72rem',
+                              fontWeight: 700,
+                              cursor: 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '4px'
+                            }}
+                            title="Anular venta accidental y devolver stock"
+                            onClick={() => {
+                              setCancellingSale(sale);
+                              setCancelPin('');
+                              setCancelPinError('');
+                            }}
+                          >
+                            <RotateCcw size={11} />
+                            Anular
+                          </button>
+                        )}
                       </div>
                     </div>
                   ))
@@ -1133,6 +1199,149 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
         onConfirm={handleConfirmDeleteCustomer}
         onCancel={() => { if (!isDeleting) setDeleteTarget(null); }}
       />
+
+      {/* MODAL: ANULACIÓN DE VENTA CON CONFIRMACIÓN DE PIN */}
+      {cancellingSale && (
+        <div 
+          className="modal-overlay" 
+          onClick={() => { if (!isCancelling) setCancellingSale(null); }}
+          style={{ zIndex: 1200 }}
+        >
+          <div 
+            className="modal-content" 
+            style={{ maxWidth: '440px', padding: '24px' }} 
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ 
+                  width: '42px', 
+                  height: '42px', 
+                  borderRadius: '12px', 
+                  background: '#fee2e2', 
+                  color: '#dc2626', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  justifyContent: 'center',
+                  flexShrink: 0
+                }}>
+                  <RotateCcw size={22} />
+                </div>
+                <div>
+                  <h3 style={{ fontSize: '1.2rem', fontWeight: 800, margin: 0, color: 'var(--text-main)' }}>
+                    ¿Anular esta Venta Fiada?
+                  </h3>
+                  <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)', margin: '2px 0 0' }}>
+                    Se revertirá la deuda y se repondrá el stock.
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => { if (!isCancelling) setCancellingSale(null); }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '4px' }}
+                aria-label="Cerrar"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Resumen */}
+            <div style={{
+              background: '#f8fafc',
+              border: '1px solid var(--border-subtle)',
+              borderRadius: 'var(--radius-md)',
+              padding: '12px 14px',
+              fontSize: '0.84rem',
+              marginBottom: '14px'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                <span style={{ color: 'var(--text-dim)' }}>Total de la compra:</span>
+                <strong style={{ fontSize: '1.05rem', color: '#ea580c' }}>
+                  {formatCOP(cancellingSale.total)}
+                </strong>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: 'var(--text-dim)' }}>Fecha:</span>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                  {new Date(cancellingSale.date).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                </span>
+              </div>
+            </div>
+
+            {/* Efectos */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', fontSize: '0.82rem' }}>
+              <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 'var(--radius-sm)', padding: '10px 12px', color: '#15803d' }}>
+                <strong>🟢 Reposición de Stock Automática:</strong>
+                <div style={{ marginTop: '4px', fontSize: '0.78rem' }}>
+                  {cancellingSale.items.map(it => `+${it.quantity} ${it.name}`).join(' • ')}
+                </div>
+              </div>
+
+              <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 'var(--radius-sm)', padding: '10px 12px', color: '#c2410c' }}>
+                <strong>🟠 Descuento de Deuda:</strong>
+                <div style={{ marginTop: '2px', fontSize: '0.78rem' }}>
+                  Se descontarán <strong>{formatCOP(cancellingSale.total)}</strong> de la deuda acumulada del compañero.
+                </div>
+              </div>
+            </div>
+
+            {/* PIN */}
+            <form onSubmit={handleExecuteCancelSale}>
+              <div style={{ marginBottom: '16px' }}>
+                <label style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                  Ingresa tu PIN de Administrador ({activeAdmin?.name}):
+                </label>
+                <input 
+                  type="password"
+                  maxLength={6}
+                  required
+                  autoFocus
+                  placeholder="PIN de 4 dígitos"
+                  className="input"
+                  style={{
+                    textAlign: 'center',
+                    fontSize: '1.4rem',
+                    letterSpacing: '0.3em',
+                    fontWeight: 800,
+                    padding: '8px'
+                  }}
+                  value={cancelPin}
+                  onChange={(e) => {
+                    setCancelPin(e.target.value);
+                    setCancelPinError('');
+                  }}
+                />
+                {cancelPinError && (
+                  <div style={{ color: '#ef4444', fontSize: '0.78rem', fontWeight: 700, marginTop: '6px', textAlign: 'center' }}>
+                    ⚠️ {cancelPinError}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  style={{ flex: 1 }}
+                  disabled={isCancelling}
+                  onClick={() => setCancellingSale(null)}
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="btn" 
+                  style={{ flex: 1, background: '#dc2626', color: '#fff', fontWeight: 700 }}
+                  disabled={isCancelling || !cancelPin}
+                >
+                  {isCancelling ? 'Anulando…' : 'Confirmar Anulación'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

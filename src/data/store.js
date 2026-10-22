@@ -293,6 +293,48 @@ export function useStore() {
     return newSale;
   };
 
+  const cancelSale = async (saleId) => {
+    const targetSale = sales.find(s => s.id === saleId);
+    if (!targetSale) return false;
+
+    // 1. Reponer el stock de los productos vendidos
+    if (targetSale.items && targetSale.items.length > 0) {
+      for (const item of targetSale.items) {
+        if (!item.id) continue;
+        const prod = products.find(p => p.id === item.id);
+        if (prod) {
+          const restoredStock = prod.stock + Number(item.quantity);
+          await supabase.from('products').update({ stock: restoredStock }).eq('id', item.id);
+        }
+      }
+      setProducts(prev => prev.map(p => {
+        const it = targetSale.items.find(i => i.id === p.id);
+        return it ? { ...p, stock: p.stock + Number(it.quantity) } : p;
+      }));
+    }
+
+    // 2. Si fue fiado, descontar la deuda acumulada del compañero
+    if (targetSale.type === 'fiado' && targetSale.customerId) {
+      const cust = customers.find(c => c.id === targetSale.customerId);
+      if (cust) {
+        const newDebt = Math.max(0, Number(cust.totalDebt || 0) - Number(targetSale.total));
+        await supabase.from('customers').update({ total_debt: newDebt }).eq('id', targetSale.customerId);
+        setCustomers(prev => prev.map(c => c.id === targetSale.customerId ? { ...c, totalDebt: newDebt } : c));
+      }
+    }
+
+    // 3. Eliminar la venta de Supabase
+    const { error: delErr } = await supabase.from('sales').delete().eq('id', saleId);
+    if (delErr) {
+      console.error('[store] Error eliminando venta:', delErr);
+      throw new Error(delErr.message);
+    }
+
+    // 4. Actualizar lista de ventas en React
+    setSales(prev => prev.filter(s => s.id !== saleId));
+    return true;
+  };
+
   const recordPayment = async ({ customerId, amount, paymentMethod = 'efectivo', notes = '' }) => {
     const targetCust = customers.find(c => c.id === customerId);
     if (!targetCust || !activeAdmin || !currentPeriod) return null;
@@ -386,6 +428,24 @@ export function useStore() {
       throw new Error(error.message);
     }
     setProducts(prev => prev.map(p => p.id === id ? { ...p, stock: newStock } : p));
+  };
+
+  const bulkRestockProducts = async (items) => {
+    // items: [{ id, addQty }]
+    for (const item of items) {
+      const addQtyNum = Number(item.addQty);
+      if (!addQtyNum || addQtyNum <= 0) continue;
+      const prod = products.find(p => p.id === item.id);
+      if (!prod) continue;
+      const newStock = prod.stock + addQtyNum;
+      const { error } = await supabase.from('products').update({ stock: newStock }).eq('id', item.id);
+      if (error) console.error('[store] Error en reabastecimiento de producto:', item.id, error);
+    }
+    setProducts(prev => prev.map(p => {
+      const match = items.find(i => i.id === p.id);
+      const addNum = match ? Number(match.addQty) : 0;
+      return addNum > 0 ? { ...p, stock: p.stock + addNum } : p;
+    }));
   };
 
   const deleteProduct = async (id) => {
@@ -627,10 +687,12 @@ export function useStore() {
     error,
     // Acciones
     recordSale,
+    cancelSale,
     recordPayment,
     addProduct,
     updateProduct,
     updateStock,
+    bulkRestockProducts,
     deleteProduct,
     addCustomer,
     updateCustomer,
