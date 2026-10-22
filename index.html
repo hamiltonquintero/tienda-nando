@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/logo.png" />
+    <!-- Apple Touch Icon (para "Añadir a pantalla de inicio" en iOS) -->
+    <link rel="apple-touch-icon" href="/logo.png" />
+
+    <!-- Viewport: se eliminó user-scalable=no para accesibilidad (WCAG 1.4.4) -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- PWA / Instalación -->
+    <meta name="theme-color" content="#0284c7" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Surtimueve" />
+
+    <title>Surtimueve más - Sistema de Inventario y Fiao</title>
+    <meta name="description" content="Sistema de gestión de inventario, ventas y cuentas por cobrar quincenales para Surtimueve más." />
+
+    <!-- Google Fonts (también cacheadas por el service worker para uso offline) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      <div style="padding:24px;text-align:center;font-family:system-ui,sans-serif;">
+        Para usar Surtimueve más necesitas tener JavaScript habilitado en tu navegador.
+      </div>
+    </noscript>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
