@@ -7,6 +7,7 @@ import {
 import confetti from 'canvas-confetti';
 import { CATEGORIES } from '../data/initialProducts';
 import { formatCOP } from '../data/store';
+import ProductThumbnail from './ProductThumbnail';
 
 export default function DigitalCatalog({ 
   products, 
@@ -372,19 +373,7 @@ ${itemsList}
                 <div>
                   {/* Top: Icon & Stock Badge */}
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                    <div style={{
-                      width: '48px',
-                      height: '48px',
-                      borderRadius: '14px',
-                      background: '#f8fafc',
-                      border: '1px solid var(--border-subtle)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '1.7rem'
-                    }}>
-                      {p.icon || '📦'}
-                    </div>
+                    <ProductThumbnail icon={p.icon} name={p.name} size={58} />
 
                     {isOutOfStock ? (
                       <span className="badge badge-danger" style={{ fontSize: '0.68rem' }}>Agotado</span>

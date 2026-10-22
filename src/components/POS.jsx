@@ -8,6 +8,7 @@ import confetti from 'canvas-confetti';
 import { CATEGORIES } from '../data/initialProducts';
 import { formatCOP } from '../data/store';
 import ConfirmModal from './ConfirmModal';
+import ProductThumbnail from './ProductThumbnail';
 
 export default function POS({ 
   products, 
@@ -524,7 +525,7 @@ export default function POS({
 
                 <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
-                    <span style={{ fontSize: '1.9rem', lineHeight: 1 }}>{p.icon || '📦'}</span>
+                    <ProductThumbnail icon={p.icon} name={p.name} size={48} />
                     {isOutOfStock ? (
                       <span className="badge badge-danger">Agotado</span>
                     ) : isLowStock ? (

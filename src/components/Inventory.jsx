@@ -1,13 +1,49 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { 
   Package, Search, Plus, Minus, Edit, Trash2, 
   AlertTriangle, DollarSign, TrendingUp, Layers, Check,
-  Truck, PackagePlus, CheckCircle2, RotateCcw, X
+  Truck, PackagePlus, CheckCircle2, RotateCcw, X, Camera, Image, UploadCloud
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { CATEGORIES } from '../data/initialProducts';
 import { formatCOP } from '../data/store';
 import ConfirmModal from './ConfirmModal';
+import ProductThumbnail from './ProductThumbnail';
+
+// Comprime y redimensiona imágenes del cliente en un canvas liviano (<30KB)
+const compressImage = (file, maxWidth = 350, maxHeight = 350, quality = 0.82) => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new window.Image();
+      img.onload = () => {
+        let { width, height } = img;
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+        const dataUrl = canvas.toDataURL('image/jpeg', quality);
+        resolve(dataUrl);
+      };
+      img.onerror = reject;
+      img.src = e.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
 
 export default function Inventory({ 
   products, 
@@ -40,6 +76,23 @@ export default function Inventory({
   const [formStock, setFormStock] = useState('12');
   const [formMinStock, setFormMinStock] = useState('3');
   const [formIcon, setFormIcon] = useState('📦');
+  const fileInputRef = useRef(null);
+  const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
+
+  const handlePhotoSelect = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try {
+      setIsProcessingPhoto(true);
+      const compressed = await compressImage(file, 400, 400, 0.82);
+      setFormIcon(compressed);
+    } catch (err) {
+      console.error('[Inventory] Error al procesar imagen:', err);
+    } finally {
+      setIsProcessingPhoto(false);
+      e.target.value = '';
+    }
+  };
 
   // Inventory Totals
   const totalValueSale = useMemo(() => {
@@ -331,7 +384,7 @@ export default function Inventory({
                   >
                     <td style={{ padding: '12px 16px', fontWeight: 600 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <span style={{ fontSize: '1.4rem' }}>{p.icon || '📦'}</span>
+                        <ProductThumbnail icon={p.icon} name={p.name} size={36} />
                         <div>
                           <div style={{ color: 'var(--text-main)', fontSize: '0.92rem' }}>{p.name}</div>
                           {isOutOfStock && <span className="badge badge-danger">Agotado</span>}
@@ -524,15 +577,69 @@ export default function Inventory({
 
                 <div>
                   <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                    Ícono / Emoji:
+                    Foto o Sticker del Producto:
                   </label>
-                  <input 
-                    type="text" 
-                    className="input" 
-                    value={formIcon}
-                    onChange={(e) => setFormIcon(e.target.value)}
-                    placeholder="📦, 🍪, 🥤, 🍫..."
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <ProductThumbnail icon={formIcon} name={formName} size={48} />
+                    
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', flex: 1 }}>
+                      <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        accept="image/*" 
+                        style={{ display: 'none' }}
+                        onChange={handlePhotoSelect}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => fileInputRef.current && fileInputRef.current.click()}
+                        className="btn btn-secondary"
+                        disabled={isProcessingPhoto}
+                        style={{
+                          fontSize: '0.78rem',
+                          padding: '6px 12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px',
+                          justifyContent: 'center',
+                          background: '#f0fdf4',
+                          color: '#15803d',
+                          borderColor: '#86efac',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        <Camera size={14} />
+                        <span>{isProcessingPhoto ? 'Cargando...' : '📸 Subir Foto / Cámara'}</span>
+                      </button>
+
+                      {formIcon && (formIcon.startsWith('data:') || formIcon.startsWith('http') || formIcon.startsWith('/')) ? (
+                        <button
+                          type="button"
+                          onClick={() => setFormIcon('📦')}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#dc2626',
+                            fontSize: '0.72rem',
+                            cursor: 'pointer',
+                            textAlign: 'left',
+                            padding: '2px 4px'
+                          }}
+                        >
+                          ✕ Quitar foto y usar sticker
+                        </button>
+                      ) : (
+                        <input 
+                          type="text" 
+                          className="input" 
+                          style={{ fontSize: '0.78rem', padding: '4px 8px' }}
+                          value={formIcon}
+                          onChange={(e) => setFormIcon(e.target.value)}
+                          placeholder="Emoji ej. 🍪, 🥤, 🥔..."
+                        />
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -730,7 +837,7 @@ export default function Inventory({
                     >
                       {/* Left: Product Info */}
                       <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: '220px', flex: '1 1 auto' }}>
-                        <span style={{ fontSize: '1.6rem' }}>{p.icon || '📦'}</span>
+                        <ProductThumbnail icon={p.icon} name={p.name} size={36} />
                         <div>
                           <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-main)' }}>
                             {p.name}
