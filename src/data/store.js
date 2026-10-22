@@ -107,16 +107,44 @@ const mapOrder = (r) => ({
 // Hook principal
 // ─────────────────────────────────────────────────────────────
 export function useStore() {
-  const [products,        setProducts]        = useState([]);
-  const [customers,       setCustomers]       = useState([]);
+  const [products, setProducts] = useState(() => {
+    try {
+      const cached = localStorage.getItem('surtimueve_cached_products');
+      if (cached) return JSON.parse(cached);
+    } catch (e) {}
+    return INITIAL_PRODUCTS;
+  });
+
+  const [customers, setCustomers] = useState(() => {
+    try {
+      const cached = localStorage.getItem('surtimueve_cached_customers');
+      if (cached) return JSON.parse(cached);
+    } catch (e) {}
+    return INITIAL_CUSTOMERS;
+  });
+
+  const [admins, setAdmins] = useState(() => {
+    try {
+      const cached = localStorage.getItem('surtimueve_cached_admins');
+      if (cached) return JSON.parse(cached);
+    } catch (e) {}
+    return INITIAL_ADMINS;
+  });
+
+  const [orders, setOrders] = useState(() => {
+    try {
+      const cached = localStorage.getItem('surtimueve_orders_backup');
+      if (cached) return JSON.parse(cached);
+    } catch (e) {}
+    return [];
+  });
+
   const [sales,           setSales]           = useState([]);
   const [payments,        setPayments]        = useState([]);
-  const [orders,          setOrders]          = useState([]);
-  const [admins,          setAdmins]          = useState([]);
   const [activeAdminId,   setActiveAdminId]   = useState('admin-1');
   const [currentPeriod,   setCurrentPeriod]   = useState(null);
   const [archivedPeriods, setArchivedPeriods] = useState([]);
-  const [loading,         setLoading]         = useState(true);
+  const [loading,         setLoading]         = useState(false); // No bloquea si ya hay datos
   const [error,           setError]           = useState(null);
 
   // activeAdminId se guarda solo en localStorage (es local a cada dispositivo)
@@ -130,9 +158,8 @@ export function useStore() {
 
   const activeAdmin = admins.find(a => a.id === activeAdminId) || admins[0] || null;
 
-  // ── Carga inicial ──────────────────────────────────────────
+  // ── Carga inicial en segundo plano ──────────────────────────
   const loadAll = useCallback(async () => {
-    setLoading(true);
     setError(null);
     try {
       const [
@@ -154,11 +181,21 @@ export function useStore() {
       const firstError = e1 || e2 || e3 || e4 || e5 || e6;
       if (firstError) throw firstError;
 
-      setProducts(prods.map(mapProduct));
-      setCustomers(custs.map(mapCustomer));
-      setAdmins(admns.map(mapAdmin));
+      const mappedProds = prods.map(mapProduct);
+      const mappedCusts = custs.map(mapCustomer);
+      const mappedAdmns = admns.map(mapAdmin);
+
+      setProducts(mappedProds);
+      setCustomers(mappedCusts);
+      setAdmins(mappedAdmns);
       setSales(slsRaw.map(mapSale));
       setPayments(pays.map(mapPayment));
+
+      try {
+        localStorage.setItem('surtimueve_cached_products', JSON.stringify(mappedProds));
+        localStorage.setItem('surtimueve_cached_customers', JSON.stringify(mappedCusts));
+        localStorage.setItem('surtimueve_cached_admins', JSON.stringify(mappedAdmns));
+      } catch (e) {}
 
       const mappedPeriods = perds.map(mapPeriod);
       const open   = mappedPeriods.find(p => !p.endDate) ?? null;

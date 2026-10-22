@@ -46,8 +46,8 @@ export default function App() {
     setActiveTab('pos');
   };
 
-  // ── Pantalla de carga inicial ──────────────────────────────
-  if (store.loading) {
+  // ── Pantalla de carga inicial (solo si no hay productos cargados) ──────
+  if (store.loading && (!store.products || store.products.length === 0)) {
     return (
       <div style={{
         minHeight: '100vh', display: 'flex', flexDirection: 'column',
@@ -80,8 +80,8 @@ export default function App() {
     );
   }
 
-  // ── Error de conexión ──────────────────────────────────────
-  if (store.error) {
+  // ── Error de conexión (solo si no hay productos disponibles) ──────
+  if (store.error && (!store.products || store.products.length === 0)) {
     return (
       <div style={{
         minHeight: '100vh', display: 'flex', alignItems: 'center',
