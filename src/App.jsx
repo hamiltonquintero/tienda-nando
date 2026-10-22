@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ShoppingBag, Users, Package, BarChart3, Settings as SettingsIcon } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ShoppingBag, Users, Package, BarChart3, Settings as SettingsIcon, Inbox } from 'lucide-react';
 import { useStore } from './data/store';
 import ErrorBoundary from './components/ErrorBoundary';
 import Header from './components/Header';
@@ -9,6 +9,9 @@ import Inventory from './components/Inventory';
 import Reports from './components/Reports';
 import Settings from './components/Settings';
 import PinModal from './components/PinModal';
+import DigitalCatalog from './components/DigitalCatalog';
+import OrdersInboxModal from './components/OrdersInboxModal';
+import ShareCatalogModal from './components/ShareCatalogModal';
 
 export default function App() {
   const store = useStore();
@@ -17,6 +20,25 @@ export default function App() {
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [saleType, setSaleType] = useState('contado');
   const [pinModalState, setPinModalState] = useState({ isOpen: false, targetAdmin: null });
+
+  // Estado para Catálogo Digital y Pedidos
+  const [isCatalogView, setIsCatalogView] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.location.search.includes('view=catalogo') || window.location.hash === '#catalogo';
+  });
+  const [isOrdersInboxOpen, setIsOrdersInboxOpen] = useState(false);
+  const [isShareCatalogOpen, setIsShareCatalogOpen] = useState(false);
+  const [catalogPinModalOpen, setCatalogPinModalOpen] = useState(false);
+
+  // Escuchar cambios de URL para soportar compartir enlace
+  useEffect(() => {
+    const handlePopState = () => {
+      const isCat = window.location.search.includes('view=catalogo') || window.location.hash === '#catalogo';
+      setIsCatalogView(isCat);
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   const handleFiarToCustomer = (customer) => {
     setSelectedCustomerId(customer.id);
@@ -96,6 +118,7 @@ export default function App() {
   // Calculate total pending debt for badge
   const totalPendingDebt = store.customers.reduce((acc, c) => acc + (c.totalDebt || 0), 0);
   const cartTotalItems = cart.reduce((acc, it) => acc + it.quantity, 0);
+  const pendingOrdersCount = (store.orders || []).filter(o => o.status === 'pending').length;
 
   // Switch Admin Handlers
   const handleOpenSwitchAdmin = (targetAdmin = null) => {
@@ -111,6 +134,33 @@ export default function App() {
     store.setActiveAdminId(newAdminId);
   };
 
+  // ── Vista Pública: Catálogo Digital para Compañeros ──────
+  if (isCatalogView) {
+    return (
+      <ErrorBoundary>
+        <DigitalCatalog 
+          products={store.products}
+          customers={store.customers}
+          onAddCustomer={store.addCustomer}
+          onCreateOrder={store.createOrder}
+          onSwitchToAdmin={() => setCatalogPinModalOpen(true)}
+        />
+        <PinModal 
+          isOpen={catalogPinModalOpen}
+          targetAdmin={store.activeAdmin || store.admins[0]}
+          onClose={() => setCatalogPinModalOpen(false)}
+          onVerified={() => {
+            setCatalogPinModalOpen(false);
+            setIsCatalogView(false);
+            if (window.history.pushState) {
+              window.history.pushState(null, '', window.location.pathname);
+            }
+          }}
+        />
+      </ErrorBoundary>
+    );
+  }
+
   return (
     <ErrorBoundary>
     <div className="app-container">
@@ -123,6 +173,9 @@ export default function App() {
         currentPeriod={store.currentPeriod}
         totalPendingDebt={totalPendingDebt}
         cartCount={cartTotalItems}
+        pendingOrdersCount={pendingOrdersCount}
+        onOpenOrdersInbox={() => setIsOrdersInboxOpen(true)}
+        onOpenShareCatalog={() => setIsShareCatalogOpen(true)}
       />
 
       {/* Main Tab Views */}
@@ -140,6 +193,9 @@ export default function App() {
             setSelectedCustomerId={setSelectedCustomerId}
             saleType={saleType}
             setSaleType={setSaleType}
+            pendingOrdersCount={pendingOrdersCount}
+            onOpenOrdersInbox={() => setIsOrdersInboxOpen(true)}
+            onOpenShareCatalog={() => setIsShareCatalogOpen(true)}
           />
         )}
 
@@ -207,6 +263,31 @@ export default function App() {
         </button>
 
         <button 
+          className="mobile-nav-item"
+          style={{ position: 'relative' }}
+          onClick={() => setIsOrdersInboxOpen(true)}
+        >
+          <Inbox size={20} color={pendingOrdersCount > 0 ? '#ea580c' : 'currentColor'} />
+          <span>Pedidos</span>
+          {pendingOrdersCount > 0 && (
+            <span style={{
+              position: 'absolute',
+              top: '4px',
+              right: 'calc(50% - 18px)',
+              background: '#ea580c',
+              color: '#fff',
+              fontSize: '0.65rem',
+              fontWeight: 900,
+              borderRadius: '999px',
+              padding: '1px 5px',
+              lineHeight: 1
+            }}>
+              {pendingOrdersCount}
+            </span>
+          )}
+        </button>
+
+        <button 
           className={`mobile-nav-item ${activeTab === 'fiao' ? 'active' : ''}`}
           onClick={() => setActiveTab('fiao')}
         >
@@ -245,6 +326,28 @@ export default function App() {
         targetAdmin={pinModalState.targetAdmin}
         onClose={() => setPinModalState({ isOpen: false, targetAdmin: null })}
         onVerified={handleAdminVerified}
+      />
+
+      {/* Bandeja de Pedidos del Catálogo */}
+      <OrdersInboxModal 
+        isOpen={isOrdersInboxOpen}
+        onClose={() => setIsOrdersInboxOpen(false)}
+        orders={store.orders || []}
+        onApproveOrder={store.approveOrder}
+        onRejectOrder={store.rejectOrder}
+      />
+
+      {/* Modal Compartir Catálogo */}
+      <ShareCatalogModal 
+        isOpen={isShareCatalogOpen}
+        onClose={() => setIsShareCatalogOpen(false)}
+        onOpenCatalogView={() => {
+          setIsShareCatalogOpen(false);
+          setIsCatalogView(true);
+          if (window.history.pushState) {
+            window.history.pushState(null, '', '?view=catalogo');
+          }
+        }}
       />
     </div>
     </ErrorBoundary>

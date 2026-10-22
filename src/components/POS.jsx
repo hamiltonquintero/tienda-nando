@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { 
   Search, ShoppingCart, Trash2, Plus, Minus, CheckCircle, 
   UserPlus, User, CreditCard, DollarSign, AlertTriangle, Sparkles,
-  MessageSquare, Copy, Check, CheckCircle2, X, Send, Share2
+  MessageSquare, Copy, Check, CheckCircle2, X, Send, Share2, Inbox
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { CATEGORIES } from '../data/initialProducts';
@@ -20,7 +20,10 @@ export default function POS({
   saleType: propSaleType,
   setSaleType: propSetSaleType,
   selectedCustomerId: propSelectedCustomerId,
-  setSelectedCustomerId: propSetSelectedCustomerId
+  setSelectedCustomerId: propSetSelectedCustomerId,
+  pendingOrdersCount = 0,
+  onOpenOrdersInbox,
+  onOpenShareCatalog
 }) {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
@@ -277,27 +280,93 @@ export default function POS({
             Ver Canasta · {cartCount} {cartCount === 1 ? 'ítem' : 'ítems'} · {formatCOP(cartTotal)}
           </button>
         )}
+        {/* Banner de Pedidos Pendientes del Catálogo */}
+        {pendingOrdersCount > 0 && onOpenOrdersInbox && (
+          <div style={{
+            background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
+            border: '1.5px solid #fdba74',
+            borderRadius: 'var(--radius-lg)',
+            padding: '12px 16px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            marginBottom: '16px',
+            boxShadow: '0 4px 14px rgba(234, 88, 12, 0.12)',
+            gap: '12px',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <div style={{
+                background: '#ea580c',
+                color: '#fff',
+                width: '32px',
+                height: '32px',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontWeight: 900,
+                fontSize: '0.86rem'
+              }}>
+                {pendingOrdersCount}
+              </div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '0.92rem', color: '#9a3412' }}>
+                  {pendingOrdersCount === 1 ? '¡Hay 1 pedido pendiente del catálogo!' : `¡Hay ${pendingOrdersCount} pedidos pendientes del catálogo!`}
+                </div>
+                <div style={{ fontSize: '0.78rem', color: '#c2410c' }}>
+                  Un compañero acaba de hacer un pedido desde su puesto
+                </div>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              className="btn btn-orange"
+              style={{ padding: '7px 16px', fontSize: '0.82rem', whiteSpace: 'nowrap' }}
+              onClick={onOpenOrdersInbox}
+            >
+              Revisar y Entregar ➔
+            </button>
+          </div>
+        )}
+
         {/* Search & Categories Bar */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
-          <div style={{ position: 'relative' }}>
-            <Search 
-              size={18} 
-              style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} 
-            />
-            <input 
-              type="text"
-              placeholder="Buscar producto (ej. Tosh, Coca Cola, Papas, Trident...)"
-              className="input"
-              style={{ paddingLeft: '42px', fontSize: '1rem' }}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-            {search && (
-              <button 
-                onClick={() => setSearch('')}
-                style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+          <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ position: 'relative', flex: 1 }}>
+              <Search 
+                size={18} 
+                style={{ position: 'absolute', left: '14px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} 
+              />
+              <input 
+                type="text"
+                placeholder="Buscar producto (ej. Tosh, Coca Cola, Papas, Trident...)"
+                className="input"
+                style={{ paddingLeft: '42px', fontSize: '1rem' }}
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+              {search && (
+                <button 
+                  onClick={() => setSearch('')}
+                  style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
+            {onOpenShareCatalog && (
+              <button
+                type="button"
+                className="btn btn-secondary desktop-only"
+                onClick={onOpenShareCatalog}
+                style={{ display: 'flex', alignItems: 'center', gap: '6px', whiteSpace: 'nowrap', fontSize: '0.86rem', padding: '0 14px' }}
+                title="Compartir enlace del Catálogo Digital"
               >
-                ✕
+                <Share2 size={15} />
+                <span>Compartir Catálogo</span>
               </button>
             )}
           </div>

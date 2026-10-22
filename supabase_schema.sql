@@ -103,7 +103,25 @@ CREATE TABLE IF NOT EXISTS payments (
 );
 
 -- ────────────────────────────────────────────────────────────
--- 8. ÍNDICES para consultas frecuentes
+-- 8. ORDERS (Pedidos pendientes desde el Catálogo Digital de Compañeros)
+-- ────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS orders (
+  id              TEXT PRIMARY KEY,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  customer_id     TEXT REFERENCES customers(id) ON DELETE SET NULL,
+  customer_name   TEXT NOT NULL,
+  customer_area   TEXT NOT NULL DEFAULT '',
+  customer_phone  TEXT NOT NULL DEFAULT '',
+  payment_type    TEXT NOT NULL DEFAULT 'fiado', -- 'fiado' | 'contado'
+  payment_method  TEXT NOT NULL DEFAULT 'credito', -- 'credito' | 'efectivo' | 'nequi' | 'daviplata'
+  items           JSONB NOT NULL DEFAULT '[]'::jsonb,
+  total           NUMERIC(12,2) NOT NULL,
+  notes           TEXT NOT NULL DEFAULT '',
+  status          TEXT NOT NULL DEFAULT 'pending' -- 'pending' | 'approved' | 'rejected'
+);
+
+-- ────────────────────────────────────────────────────────────
+-- 9. ÍNDICES para consultas frecuentes
 -- ────────────────────────────────────────────────────────────
 CREATE INDEX IF NOT EXISTS idx_sales_period     ON sales(period_id);
 CREATE INDEX IF NOT EXISTS idx_sales_customer   ON sales(customer_id);
@@ -111,9 +129,10 @@ CREATE INDEX IF NOT EXISTS idx_sale_items_sale  ON sale_items(sale_id);
 CREATE INDEX IF NOT EXISTS idx_payments_period  ON payments(period_id);
 CREATE INDEX IF NOT EXISTS idx_payments_customer ON payments(customer_id);
 CREATE INDEX IF NOT EXISTS idx_periods_open     ON periods(end_date) WHERE end_date IS NULL;
+CREATE INDEX IF NOT EXISTS idx_orders_status    ON orders(status);
 
 -- ────────────────────────────────────────────────────────────
--- 9. ROW LEVEL SECURITY (RLS)
+-- 10. ROW LEVEL SECURITY (RLS)
 --    La app usa la clave anon pública → necesitamos políticas
 --    permisivas para todas las operaciones (la autenticación
 --    real la maneja el PIN de admin dentro de la propia app).
@@ -125,6 +144,7 @@ ALTER TABLE periods       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales         ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sale_items    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE payments      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE orders        ENABLE ROW LEVEL SECURITY;
 
 -- Políticas: acceso total para la clave anon (rol anon = visitante no autenticado)
 CREATE POLICY "anon_all_admins"     ON admins     FOR ALL TO anon USING (true) WITH CHECK (true);
@@ -134,6 +154,7 @@ CREATE POLICY "anon_all_periods"    ON periods    FOR ALL TO anon USING (true) W
 CREATE POLICY "anon_all_sales"      ON sales      FOR ALL TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "anon_all_sale_items" ON sale_items FOR ALL TO anon USING (true) WITH CHECK (true);
 CREATE POLICY "anon_all_payments"   ON payments   FOR ALL TO anon USING (true) WITH CHECK (true);
+CREATE POLICY "anon_all_orders"     ON orders     FOR ALL TO anon USING (true) WITH CHECK (true);
 
 -- ────────────────────────────────────────────────────────────
 -- 10. SEED DATA — Datos iniciales
@@ -198,4 +219,4 @@ ON CONFLICT (id) DO NOTHING;
 -- ────────────────────────────────────────────────────────────
 -- 11. SUPABASE REALTIME (Para sincronización inmediata multi-dispositivo)
 -- ────────────────────────────────────────────────────────────
-ALTER PUBLICATION supabase_realtime ADD TABLE customers, products, sales, sale_items, payments, periods, admins;
+ALTER PUBLICATION supabase_realtime ADD TABLE customers, products, sales, sale_items, payments, periods, admins, orders;

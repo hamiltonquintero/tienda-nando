@@ -88,6 +88,21 @@ const mapPayment = (r) => ({
   periodId: r.period_id
 });
 
+const mapOrder = (r) => ({
+  id: r.id,
+  createdAt: r.created_at || new Date().toISOString(),
+  customerId: r.customer_id,
+  customerName: r.customer_name,
+  customerArea: r.customer_area || '',
+  customerPhone: r.customer_phone || '',
+  paymentType: r.payment_type || 'fiado',
+  paymentMethod: r.payment_method || 'credito',
+  items: Array.isArray(r.items) ? r.items : (typeof r.items === 'string' ? JSON.parse(r.items) : []),
+  total: Number(r.total || 0),
+  notes: r.notes || '',
+  status: r.status || 'pending'
+});
+
 // ─────────────────────────────────────────────────────────────
 // Hook principal
 // ─────────────────────────────────────────────────────────────
@@ -96,6 +111,7 @@ export function useStore() {
   const [customers,       setCustomers]       = useState([]);
   const [sales,           setSales]           = useState([]);
   const [payments,        setPayments]        = useState([]);
+  const [orders,          setOrders]          = useState([]);
   const [admins,          setAdmins]          = useState([]);
   const [activeAdminId,   setActiveAdminId]   = useState('admin-1');
   const [currentPeriod,   setCurrentPeriod]   = useState(null);
@@ -150,6 +166,20 @@ export function useStore() {
       setCurrentPeriod(open);
       setArchivedPeriods(closed);
 
+      // Cargar pedidos pendientes de forma segura
+      try {
+        const { data: ords, error: ordErr } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+        if (!ordErr && ords) {
+          setOrders(ords.map(mapOrder));
+        } else {
+          const stored = JSON.parse(localStorage.getItem('surtimueve_orders_backup') || '[]');
+          setOrders(stored);
+        }
+      } catch (e) {
+        const stored = JSON.parse(localStorage.getItem('surtimueve_orders_backup') || '[]');
+        setOrders(stored);
+      }
+
     } catch (err) {
       console.error('[store] Error cargando datos:', err);
       setError(err.message ?? 'Error de conexión con la base de datos.');
@@ -187,6 +217,12 @@ export function useStore() {
         const { data } = await supabase.from('payments').select('*').order('date', { ascending: false });
         if (data) setPayments(data.map(mapPayment));
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async () => {
+        try {
+          const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+          if (data) setOrders(data.map(mapOrder));
+        } catch (e) {}
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'periods' }, async () => {
         const { data } = await supabase.from('periods').select('*').order('start_date', { ascending: false });
         if (data) {
@@ -205,6 +241,86 @@ export function useStore() {
   }, []);
 
   // ── ACCIONES ──────────────────────────────────────────────
+
+  const createOrder = async ({
+    customerId = null,
+    customerName,
+    customerArea = '',
+    customerPhone = '',
+    paymentType = 'fiado',
+    paymentMethod = 'credito',
+    items = [],
+    total = 0,
+    notes = ''
+  }) => {
+    const orderId = `ord-${Date.now()}`;
+    const newOrderData = {
+      id: orderId,
+      created_at: new Date().toISOString(),
+      customer_id: customerId || null,
+      customer_name: customerName.trim(),
+      customer_area: customerArea?.trim() || '',
+      customer_phone: customerPhone?.trim() || '',
+      payment_type: paymentType,
+      payment_method: paymentMethod,
+      items: items,
+      total: Number(total),
+      notes: notes?.trim() || '',
+      status: 'pending'
+    };
+
+    try {
+      const { error } = await supabase.from('orders').insert(newOrderData);
+      if (error) console.warn('[store] Advertencia insertando orden en Supabase:', error);
+    } catch (e) {
+      console.warn('[store] Error insertando orden en Supabase:', e);
+    }
+
+    const mapped = mapOrder(newOrderData);
+    setOrders(prev => [mapped, ...prev]);
+
+    try {
+      const stored = JSON.parse(localStorage.getItem('surtimueve_orders_backup') || '[]');
+      localStorage.setItem('surtimueve_orders_backup', JSON.stringify([mapped, ...stored].slice(0, 50)));
+    } catch (e) {}
+
+    return mapped;
+  };
+
+  const approveOrder = async (orderId) => {
+    const targetOrder = orders.find(o => o.id === orderId);
+    if (!targetOrder || targetOrder.status !== 'pending') return null;
+
+    // 1. Registrar la venta oficial en el sistema (descuenta stock y anota a fiao si aplica)
+    const saleResult = await recordSale({
+      type: targetOrder.paymentType,
+      customerId: targetOrder.customerId,
+      customerName: targetOrder.customerName,
+      items: targetOrder.items,
+      total: targetOrder.total,
+      paymentMethod: targetOrder.paymentMethod
+    });
+
+    // 2. Marcar orden como aprobada
+    try {
+      await supabase.from('orders').update({ status: 'approved' }).eq('id', orderId);
+    } catch (e) {
+      console.warn('[store] Error actualizando estado de orden:', e);
+    }
+
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'approved' } : o));
+    return saleResult;
+  };
+
+  const rejectOrder = async (orderId) => {
+    try {
+      await supabase.from('orders').update({ status: 'rejected' }).eq('id', orderId);
+    } catch (e) {
+      console.warn('[store] Error rechazando orden:', e);
+    }
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status: 'rejected' } : o));
+    return true;
+  };
 
   const recordSale = async ({ type, customerId = null, customerName = null, items, total, paymentMethod = 'efectivo' }) => {
     if (!activeAdmin || !currentPeriod) return null;
@@ -678,6 +794,7 @@ export function useStore() {
     customers,
     sales,
     payments,
+    orders,
     admins,
     activeAdmin,
     setActiveAdminId,
@@ -689,6 +806,9 @@ export function useStore() {
     recordSale,
     cancelSale,
     recordPayment,
+    createOrder,
+    approveOrder,
+    rejectOrder,
     addProduct,
     updateProduct,
     updateStock,

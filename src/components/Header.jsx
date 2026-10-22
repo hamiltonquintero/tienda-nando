@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingBag, Users, Package, BarChart3, Settings, ShieldCheck, Calendar } from 'lucide-react';
+import { ShoppingBag, Users, Package, BarChart3, Settings, ShieldCheck, Calendar, Inbox, Share2 } from 'lucide-react';
 
 export default function Header({ 
   activeTab, 
@@ -8,7 +8,10 @@ export default function Header({
   onSwitchAdminClick,
   currentPeriod,
   totalPendingDebt,
-  cartCount
+  cartCount,
+  pendingOrdersCount = 0,
+  onOpenOrdersInbox,
+  onOpenShareCatalog
 }) {
   return (
     <header className="app-header">
@@ -86,8 +89,69 @@ export default function Header({
         </button>
       </nav>
 
-      {/* Right side: Period badge & Admin pill */}
-      <div className="admin-badge-container">
+      {/* Right side: Orders inbox, Share catalog, Period badge & Admin pill */}
+      <div className="admin-badge-container" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {/* Botón Bandeja de Pedidos */}
+        <button 
+          type="button"
+          onClick={onOpenOrdersInbox}
+          style={{
+            position: 'relative',
+            padding: '7px 12px',
+            borderRadius: '999px',
+            border: pendingOrdersCount > 0 ? '1.5px solid #ea580c' : '1px solid #cbd5e1',
+            background: pendingOrdersCount > 0 ? '#fff7ed' : '#ffffff',
+            color: pendingOrdersCount > 0 ? '#ea580c' : 'var(--text-muted)',
+            fontSize: '0.8rem',
+            fontWeight: 800,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '6px',
+            cursor: 'pointer',
+            transition: 'all 0.15s ease'
+          }}
+          title="Bandeja de pedidos del catálogo digital"
+        >
+          <Inbox size={15} color={pendingOrdersCount > 0 ? '#ea580c' : 'currentColor'} />
+          <span className="desktop-only">Pedidos</span>
+          {pendingOrdersCount > 0 && (
+            <span style={{
+              background: '#ea580c',
+              color: '#ffffff',
+              fontSize: '0.72rem',
+              fontWeight: 900,
+              borderRadius: '999px',
+              padding: '1px 7px',
+              lineHeight: 1.2
+            }}>
+              {pendingOrdersCount}
+            </span>
+          )}
+        </button>
+
+        {/* Botón Compartir Catálogo */}
+        <button
+          type="button"
+          onClick={onOpenShareCatalog}
+          style={{
+            padding: '7px 12px',
+            borderRadius: '999px',
+            border: '1px solid #cbd5e1',
+            background: '#ffffff',
+            color: 'var(--brand-blue)',
+            fontSize: '0.8rem',
+            fontWeight: 700,
+            display: 'flex',
+            alignItems: 'center',
+            gap: '5px',
+            cursor: 'pointer'
+          }}
+          title="Compartir enlace del Catálogo Digital"
+        >
+          <Share2 size={14} />
+          <span className="desktop-only">Catálogo</span>
+        </button>
+
         <div 
           style={{ 
             display: 'flex', 
