@@ -209,11 +209,12 @@ export function useStore() {
   const recordSale = async ({ type, customerId = null, customerName = null, items, total, paymentMethod = 'efectivo' }) => {
     if (!activeAdmin || !currentPeriod) return null;
     const saleId = `sale-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+    const saleDate = new Date().toISOString();
 
     // 1. Insertar venta
     const { error: saleErr } = await supabase.from('sales').insert({
       id: saleId,
-      date: new Date().toISOString(),
+      date: saleDate,
       type,
       payment_method: paymentMethod,
       customer_id: customerId,
@@ -224,7 +225,10 @@ export function useStore() {
       period_id: currentPeriod.id,
       paid: type === 'contado'
     });
-    if (saleErr) { console.error('[store] Error insertando venta:', saleErr); return null; }
+    if (saleErr) {
+      console.error('[store] Error insertando venta:', saleErr);
+      throw new Error(saleErr.message);
+    }
 
     // 2. Insertar líneas de venta
     const saleItemsRows = items.map(i => ({
@@ -246,19 +250,47 @@ export function useStore() {
       const newStock = Math.max(0, prod.stock - item.quantity);
       await supabase.from('products').update({ stock: newStock }).eq('id', item.id);
     }
+    setProducts(prev => prev.map(p => {
+      const it = items.find(i => i.id === p.id);
+      return it ? { ...p, stock: Math.max(0, p.stock - it.quantity) } : p;
+    }));
 
     // 4. Si es fiado, incrementar deuda del cliente
     if (type === 'fiado' && customerId) {
       const cust = customers.find(c => c.id === customerId);
       if (cust) {
+        const newDebt = Number(cust.totalDebt || 0) + total;
         await supabase.from('customers')
-          .update({ total_debt: Number(cust.totalDebt) + total })
+          .update({ total_debt: newDebt })
           .eq('id', customerId);
+        setCustomers(prev => prev.map(c => c.id === customerId ? { ...c, totalDebt: newDebt } : c));
       }
     }
 
-    // Devolver objeto con misma forma que antes (para el confetti/toast en POS)
-    return { id: saleId, type, customerId, customerName, items, total, paymentMethod };
+    const newSale = {
+      id: saleId,
+      date: saleDate,
+      type,
+      paymentMethod,
+      customerId,
+      customerName,
+      total,
+      adminId: activeAdmin.id,
+      adminName: activeAdmin.name,
+      periodId: currentPeriod.id,
+      paid: type === 'contado',
+      items: saleItemsRows.map(i => ({
+        id: i.product_id,
+        name: i.name,
+        price: Number(i.price),
+        cost: Number(i.cost),
+        quantity: i.quantity,
+        total: Number(i.total)
+      }))
+    };
+    setSales(prev => [newSale, ...prev]);
+
+    return newSale;
   };
 
   const recordPayment = async ({ customerId, amount, paymentMethod = 'efectivo', notes = '' }) => {
@@ -266,9 +298,10 @@ export function useStore() {
     if (!targetCust || !activeAdmin || !currentPeriod) return null;
 
     const paymentId = `pay-${Date.now()}`;
+    const paymentDate = new Date().toISOString();
     const { error: payErr } = await supabase.from('payments').insert({
       id: paymentId,
-      date: new Date().toISOString(),
+      date: paymentDate,
       customer_id: customerId,
       customer_name: targetCust.name,
       amount: Number(amount),
@@ -278,13 +311,31 @@ export function useStore() {
       admin_name: activeAdmin.name,
       period_id: currentPeriod.id
     });
-    if (payErr) { console.error('[store] Error registrando pago:', payErr); return null; }
+    if (payErr) {
+      console.error('[store] Error registrando pago:', payErr);
+      throw new Error(payErr.message);
+    }
 
     // Reducir deuda del cliente
     const newDebt = Math.max(0, Number(targetCust.totalDebt) - Number(amount));
     await supabase.from('customers').update({ total_debt: newDebt }).eq('id', customerId);
 
-    return { id: paymentId, customerId, amount, paymentMethod, notes };
+    setCustomers(prev => prev.map(c => c.id === customerId ? { ...c, totalDebt: newDebt } : c));
+    const newPayment = {
+      id: paymentId,
+      date: paymentDate,
+      customerId,
+      customerName: targetCust.name,
+      amount: Number(amount),
+      paymentMethod,
+      notes,
+      adminId: activeAdmin.id,
+      adminName: activeAdmin.name,
+      periodId: currentPeriod.id
+    };
+    setPayments(prev => [newPayment, ...prev]);
+
+    return newPayment;
   };
 
   const addProduct = async (prodData) => {
@@ -299,8 +350,13 @@ export function useStore() {
       icon: prodData.icon || '📦'
     };
     const { error } = await supabase.from('products').insert(newProd);
-    if (error) console.error('[store] Error agregando producto:', error);
-    return mapProduct(newProd);
+    if (error) {
+      console.error('[store] Error agregando producto:', error);
+      throw new Error(error.message);
+    }
+    const mapped = mapProduct(newProd);
+    setProducts(prev => [...prev.filter(p => p.id !== mapped.id), mapped].sort((a, b) => a.name.localeCompare(b.name)));
+    return mapped;
   };
 
   const updateProduct = async (id, updates) => {
@@ -313,7 +369,11 @@ export function useStore() {
     if (updates.minStock  !== undefined) dbUpdates.min_stock = Number(updates.minStock);
     if (updates.icon      !== undefined) dbUpdates.icon      = updates.icon;
     const { error } = await supabase.from('products').update(dbUpdates).eq('id', id);
-    if (error) console.error('[store] Error actualizando producto:', error);
+    if (error) {
+      console.error('[store] Error actualizando producto:', error);
+      throw new Error(error.message);
+    }
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, ...updates } : p));
   };
 
   const updateStock = async (id, delta) => {
@@ -321,12 +381,20 @@ export function useStore() {
     if (!prod) return;
     const newStock = Math.max(0, prod.stock + delta);
     const { error } = await supabase.from('products').update({ stock: newStock }).eq('id', id);
-    if (error) console.error('[store] Error actualizando stock:', error);
+    if (error) {
+      console.error('[store] Error actualizando stock:', error);
+      throw new Error(error.message);
+    }
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, stock: newStock } : p));
   };
 
   const deleteProduct = async (id) => {
     const { error } = await supabase.from('products').delete().eq('id', id);
-    if (error) console.error('[store] Error eliminando producto:', error);
+    if (error) {
+      console.error('[store] Error eliminando producto:', error);
+      throw new Error(error.message);
+    }
+    setProducts(prev => prev.filter(p => p.id !== id));
   };
 
   const addCustomer = async ({ name, area = '', phone = '' }) => {
@@ -342,7 +410,9 @@ export function useStore() {
       console.error('[store] Error agregando cliente:', error);
       throw new Error(error.message);
     }
-    return mapCustomer(newCust);
+    const mapped = mapCustomer(newCust);
+    setCustomers(prev => [...prev.filter(c => c.id !== mapped.id), mapped].sort((a, b) => a.name.localeCompare(b.name)));
+    return mapped;
   };
 
   const updateCustomer = async (id, updates) => {
@@ -352,12 +422,24 @@ export function useStore() {
     if (updates.phone     !== undefined) dbUpdates.phone      = updates.phone;
     if (updates.totalDebt !== undefined) dbUpdates.total_debt = Number(updates.totalDebt);
     const { error } = await supabase.from('customers').update(dbUpdates).eq('id', id);
-    if (error) console.error('[store] Error actualizando cliente:', error);
+    if (error) {
+      console.error('[store] Error actualizando cliente:', error);
+      throw new Error(error.message);
+    }
+    setCustomers(prev => prev.map(c => c.id === id ? {
+      ...c,
+      ...updates,
+      totalDebt: updates.totalDebt !== undefined ? Number(updates.totalDebt) : c.totalDebt
+    } : c));
   };
 
   const deleteCustomer = async (id) => {
     const { error } = await supabase.from('customers').delete().eq('id', id);
-    if (error) console.error('[store] Error eliminando cliente:', error);
+    if (error) {
+      console.error('[store] Error eliminando cliente:', error);
+      throw new Error(error.message);
+    }
+    setCustomers(prev => prev.filter(c => c.id !== id));
   };
 
   const closeCurrentPeriod = async () => {
@@ -383,20 +465,47 @@ export function useStore() {
 
     // Crear el nuevo período
     const newPeriodId = `period-${Date.now()}`;
+    const newStartDate = new Date().toISOString();
+    const newName = getCurrentQuincenaName();
     const { error: newErr } = await supabase.from('periods').insert({
       id:         newPeriodId,
-      name:       getCurrentQuincenaName(),
-      start_date: new Date().toISOString()
+      name:       newName,
+      start_date: newStartDate
     });
     if (newErr) console.error('[store] Error creando nuevo período:', newErr);
 
-    return { ...currentPeriod, totalCash, totalCredit, totalCollected, salesCount: periodSales.length };
+    const closedPeriodObj = {
+      ...currentPeriod,
+      endDate: new Date().toISOString(),
+      closedBy: activeAdmin.name,
+      totalCash,
+      totalCredit,
+      totalCollected,
+      salesCount: periodSales.length
+    };
+    const newPeriodObj = {
+      id: newPeriodId,
+      name: newName,
+      startDate: newStartDate,
+      endDate: null,
+      closedBy: null,
+      totalCash: null,
+      totalCredit: null,
+      totalCollected: null,
+      salesCount: null
+    };
+
+    setArchivedPeriods(prev => [closedPeriodObj, ...prev]);
+    setCurrentPeriod(newPeriodObj);
+
+    return closedPeriodObj;
   };
 
   const updateAdminPin = async (adminId, newPin) => {
     if (!newPin || newPin.length < 4) return false;
     const { error } = await supabase.from('admins').update({ pin: newPin }).eq('id', adminId);
     if (error) { console.error('[store] Error actualizando PIN:', error); return false; }
+    setAdmins(prev => prev.map(a => a.id === adminId ? { ...a, pin: newPin } : a));
     return true;
   };
 

@@ -26,6 +26,10 @@ export default function POS({
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerArea, setNewCustomerArea] = useState('');
   const [newCustomerPhone, setNewCustomerPhone] = useState('');
+  const [savingCustomer, setSavingCustomer] = useState(false);
+  const [saveCustomerError, setSaveCustomerError] = useState('');
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [checkoutError, setCheckoutError] = useState('');
   const [showMobileCart, setShowMobileCart] = useState(false);
   const [successToast, setSuccessToast] = useState(null);
   const [fiadoError, setFiadoError] = useState(false); // reemplaza el alert()
@@ -85,8 +89,8 @@ export default function POS({
   }, [cart]);
 
   // Handle Complete Sale
-  const handleCheckout = () => {
-    if (cart.length === 0) return;
+  const handleCheckout = async () => {
+    if (cart.length === 0 || isCheckingOut) return;
 
     if (saleType === 'fiado' && !selectedCustomerId) {
       setFiadoError(true);
@@ -94,52 +98,63 @@ export default function POS({
     }
 
     const customer = customers.find(c => c.id === selectedCustomerId);
+    setIsCheckingOut(true);
+    setCheckoutError('');
 
-    const saleRecord = onRecordSale({
-      type: saleType,
-      customerId: saleType === 'fiado' ? selectedCustomerId : null,
-      customerName: saleType === 'fiado' && customer ? customer.name : null,
-      items: cart.map(i => ({
-        id: i.id,
-        name: i.name,
-        price: i.price,
-        cost: i.cost,
-        quantity: i.quantity,
-        total: i.price * i.quantity
-      })),
-      total: cartTotal,
-      paymentMethod: saleType === 'contado' ? paymentMethod : 'credito'
-    });
-
-    // Trigger celebration
     try {
-      confetti({
-        particleCount: 50,
-        spread: 60,
-        origin: { y: 0.8 }
+      await onRecordSale({
+        type: saleType,
+        customerId: customer ? customer.id : null,
+        customerName: customer ? customer.name : null,
+        items: cart.map(i => ({
+          id: i.id,
+          name: i.name,
+          price: i.price,
+          cost: i.cost,
+          quantity: i.quantity,
+          total: i.price * i.quantity
+        })),
+        total: cartTotal,
+        paymentMethod: saleType === 'contado' ? paymentMethod : 'credito'
       });
-    } catch (e) {
-      // ignore
+
+      // Trigger celebration
+      try {
+        confetti({
+          particleCount: 50,
+          spread: 60,
+          origin: { y: 0.8 }
+        });
+      } catch (e) {
+        // ignore
+      }
+
+      // Success toast
+      setSuccessToast({
+        total: cartTotal,
+        type: saleType,
+        customer: customer ? customer.name : null
+      });
+      setTimeout(() => setSuccessToast(null), 4000);
+
+      // Reset cart and selection
+      clearCart();
+      setSelectedCustomerId('');
+      setShowMobileCart(false);
+    } catch (err) {
+      console.error('[POS] Error al registrar venta:', err);
+      setCheckoutError('No se pudo registrar la venta. Verifica la conexión a internet e intenta de nuevo.');
+    } finally {
+      setIsCheckingOut(false);
     }
-
-    // Success toast
-    setSuccessToast({
-      total: cartTotal,
-      type: saleType,
-      customer: customer ? customer.name : null
-    });
-    setTimeout(() => setSuccessToast(null), 4000);
-
-    // Reset cart and selection
-    clearCart();
-    setSelectedCustomerId('');
-    setShowMobileCart(false);
   };
 
   // Quick Add Customer
   const handleQuickAddCustomer = async (e) => {
     e.preventDefault();
-    if (!newCustomerName.trim()) return;
+    if (!newCustomerName.trim() || savingCustomer) return;
+    setSavingCustomer(true);
+    setSaveCustomerError('');
     try {
       const added = await onAddCustomer({
         name: newCustomerName,
@@ -153,6 +168,9 @@ export default function POS({
       setNewCustomerPhone('');
     } catch (err) {
       console.error('[POS] Error guardando compañero:', err);
+      setSaveCustomerError('No se pudo guardar el compañero. Verifica la conexión e intenta de nuevo.');
+    } finally {
+      setSavingCustomer(false);
     }
   };
 
@@ -572,37 +590,41 @@ export default function POS({
               </div>
             )}
 
-            {/* If Fiado: Coworker Selector + Quick Add */}
-            {saleType === 'fiado' && (
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
-                  <label style={{ fontSize: '0.78rem', fontWeight: 700, color: '#ea580c' }}>
-                    ¿A quién se le fía?
-                  </label>
-                  <button
-                    type="button"
-                    onClick={() => setIsNewCustomerModalOpen(true)}
-                    style={{ background: 'none', border: 'none', color: 'var(--brand-blue)', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
-                  >
-                    <UserPlus size={14} />
-                    + Nuevo
-                  </button>
-                </div>
-                <select 
-                  className="select"
-                  value={selectedCustomerId}
-                  onChange={(e) => setSelectedCustomerId(e.target.value)}
-                  style={{ borderColor: selectedCustomerId ? '#ea580c' : '#cbd5e1' }}
+            {/* Coworker Selector + Quick Add (Opcional en Contado, Obligatorio en Fiado) */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
+                <label style={{
+                  fontSize: '0.78rem',
+                  fontWeight: 700,
+                  color: saleType === 'fiado' ? '#ea580c' : 'var(--text-muted)'
+                }}>
+                  {saleType === 'fiado' ? '¿A quién se le fía? (Obligatorio)' : 'Compañero que compra (Opcional):'}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => { setIsNewCustomerModalOpen(true); setSaveCustomerError(''); }}
+                  style={{ background: 'none', border: 'none', color: 'var(--brand-blue)', fontSize: '0.8rem', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
-                  <option value="">-- Selecciona el compañero --</option>
-                  {customers.map(c => (
-                    <option key={c.id} value={c.id}>
-                      {c.name} {c.area ? `(${c.area})` : ''} - Saldo: {formatCOP(c.totalDebt || 0)}
-                    </option>
-                  ))}
-                </select>
+                  <UserPlus size={14} />
+                  + Nuevo
+                </button>
               </div>
-            )}
+              <select 
+                className="select"
+                value={selectedCustomerId}
+                onChange={(e) => setSelectedCustomerId(e.target.value)}
+                style={{ borderColor: selectedCustomerId ? (saleType === 'fiado' ? '#ea580c' : 'var(--brand-blue)') : '#cbd5e1' }}
+              >
+                <option value="">
+                  {saleType === 'fiado' ? '-- Selecciona el compañero --' : '-- Venta rápida / Cliente general --'}
+                </option>
+                {customers.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} {c.area ? `(${c.area})` : ''} {c.totalDebt > 0 ? `· Saldo: ${formatCOP(c.totalDebt)}` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {/* Total and Checkout button */}
             <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: '14px' }}>
@@ -618,10 +640,20 @@ export default function POS({
                 className={`btn ${saleType === 'fiado' ? 'btn-orange' : 'btn-success'}`}
                 style={{ width: '100%', padding: '14px', fontSize: '1rem', borderRadius: 'var(--radius-lg)' }}
                 onClick={handleCheckout}
+                disabled={isCheckingOut}
               >
                 <CheckCircle size={20} />
-                {saleType === 'fiado' ? 'Registrar Fiao a Quincena' : 'Cobrar Venta de Contado'}
+                {isCheckingOut
+                  ? 'Guardando venta…'
+                  : (saleType === 'fiado' ? 'Registrar Fiao a Quincena' : 'Cobrar Venta de Contado')}
               </button>
+
+              {checkoutError && (
+                <div style={{ color: '#ef4444', fontSize: '0.82rem', fontWeight: 600, marginTop: '8px', textAlign: 'center' }}>
+                  ⚠️ {checkoutError}
+                </div>
+              )}
+
               <div style={{ textAlign: 'center', fontSize: '0.74rem', color: 'var(--text-dim)', marginTop: '8px' }}>
                 Atendido por: <strong>{activeAdmin.name}</strong>
               </div>
@@ -632,11 +664,11 @@ export default function POS({
 
       {/* QUICK ADD CUSTOMER MODAL */}
       {isNewCustomerModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsNewCustomerModalOpen(false)}>
+        <div className="modal-overlay" onClick={() => { setIsNewCustomerModalOpen(false); setSaveCustomerError(''); }}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: '1.25rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <UserPlus color="#38bdf8" />
-              Nuevo Compañero para Fiar
+              Nuevo Compañero ({saleType === 'fiado' ? 'para Fiar' : 'para Venta'})
             </h2>
             <form onSubmit={handleQuickAddCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
@@ -680,16 +712,22 @@ export default function POS({
                 />
               </div>
 
+              {saveCustomerError && (
+                <div style={{ color: '#ef4444', fontSize: '0.82rem', fontWeight: 600, textAlign: 'center' }}>
+                  ⚠️ {saveCustomerError}
+                </div>
+              )}
+
               <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
                 <button 
                   type="button" 
                   className="btn btn-secondary"
-                  onClick={() => setIsNewCustomerModalOpen(false)}
+                  onClick={() => { setIsNewCustomerModalOpen(false); setSaveCustomerError(''); }}
                 >
                   Cancelar
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  Guardar y Seleccionar
+                <button type="submit" className="btn btn-primary" disabled={savingCustomer}>
+                  {savingCustomer ? 'Guardando...' : 'Guardar y Seleccionar'}
                 </button>
               </div>
             </form>

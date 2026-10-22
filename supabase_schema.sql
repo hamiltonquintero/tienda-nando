@@ -194,3 +194,8 @@ INSERT INTO products (id, name, price, cost, category, stock, min_stock, icon) V
   ('prod-34', 'Manimoto',                     1800, 1300, 'Snacks & Paquetes',     12, 3, '🥜'),
   ('prod-35', 'Papas Margarita',              1800, 1300, 'Snacks & Paquetes',     16, 4, '🥔')
 ON CONFLICT (id) DO NOTHING;
+
+-- ────────────────────────────────────────────────────────────
+-- 11. SUPABASE REALTIME (Para sincronización inmediata multi-dispositivo)
+-- ────────────────────────────────────────────────────────────
+ALTER PUBLICATION supabase_realtime ADD TABLE customers, products, sales, sale_items, payments, periods, admins;
