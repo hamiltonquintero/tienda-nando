@@ -8,6 +8,7 @@ import confetti from 'canvas-confetti';
 import { CATEGORIES, STORE_OWNER_PHONE } from '../data/initialProducts';
 import { formatCOP } from '../data/store';
 import ProductThumbnail from './ProductThumbnail';
+import DevCreditBadge from './DevCreditBadge';
 
 export default function DigitalCatalog({ 
   products, 
@@ -242,9 +243,6 @@ Quedo atento cuando lo tengas listo. ¡Muchas gracias! 🙌`;
               </div>
               <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                 Catálogo Digital de Oficina · Pide desde tu puesto
-              </div>
-              <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600, marginTop: '1px' }}>
-                Desarrollado por <strong style={{ color: '#0284c7' }}>Hamilton Q.</strong>
               </div>
             </div>
           </div>
@@ -496,9 +494,6 @@ Quedo atento cuando lo tengas listo. ¡Muchas gracias! 🙌`;
           color: '#64748b'
         }}>
           <div><strong>Surtimueve más</strong> · Catálogo Digital de Oficina</div>
-          <div style={{ marginTop: '5px', fontSize: '0.74rem' }}>
-            Desarrollado por <strong style={{ color: '#0284c7' }}>Hamilton Q.</strong>
-          </div>
         </footer>
       </main>
 
@@ -933,6 +928,9 @@ Quedo atento cuando lo tengas listo. ¡Muchas gracias! 🙌`;
           </div>
         </div>
       )}
+
+      {/* Badge Flotante Animado con Colores y Movimiento */}
+      <DevCreditBadge isCatalog={true} />
     </div>
   );
 }

@@ -12,6 +12,7 @@ import PinModal from './components/PinModal';
 import DigitalCatalog from './components/DigitalCatalog';
 import OrdersInboxModal from './components/OrdersInboxModal';
 import ShareCatalogModal from './components/ShareCatalogModal';
+import DevCreditBadge from './components/DevCreditBadge';
 
 export default function App() {
   const store = useStore();
@@ -262,9 +263,6 @@ export default function App() {
           color: '#64748b'
         }}>
           <div><strong>Surtimueve más</strong> · Sistema de Gestión y Ventas</div>
-          <div style={{ marginTop: '4px', fontSize: '0.72rem' }}>
-            Desarrollado por <strong style={{ color: '#0284c7' }}>Hamilton Q.</strong>
-          </div>
         </footer>
       </main>
 
@@ -365,6 +363,8 @@ export default function App() {
           }
         }}
       />
+      {/* Badge Flotante Animado con Colores y Movimiento */}
+      <DevCreditBadge isCatalog={false} />
     </div>
     </ErrorBoundary>
   );

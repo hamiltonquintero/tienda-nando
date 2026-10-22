@@ -32,9 +32,6 @@ export default function Header({
           <div className="brand-slogan">
             ¡Todo lo que buscas y algo más! <span className="desktop-only">• Atendido por su propietario</span>
           </div>
-          <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600, marginTop: '2px' }}>
-            Desarrollado por <strong style={{ color: '#0284c7' }}>Hamilton Q.</strong>
-          </div>
         </div>
       </div>
 
