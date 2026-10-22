@@ -186,7 +186,7 @@ export default function Header({
           className="desktop-only"
         >
           <Calendar size={14} color="#0284c7" />
-          <span>{currentPeriod.name}</span>
+          <span>{currentPeriod?.name || 'Quincena Activa'}</span>
         </div>
 
         <button 
@@ -196,7 +196,7 @@ export default function Header({
         >
           <span className="admin-dot" />
           <ShieldCheck size={15} />
-          <span>{activeAdmin.name.split(' ')[0]}</span>
+          <span>{activeAdmin?.name ? activeAdmin.name.split(' ')[0] : 'Admin'}</span>
         </button>
 
         {onLogout && (

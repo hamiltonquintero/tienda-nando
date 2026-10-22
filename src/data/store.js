@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { INITIAL_PRODUCTS, INITIAL_ADMINS, INITIAL_CUSTOMERS } from './initialProducts';
+import { playOrderChime, showSystemNotification, updateTabTitleAlert } from '../utils/orderNotification';
 
 // ─────────────────────────────────────────────────────────────
 // Utilidades exportadas (sin cambios — los componentes las usan)
@@ -146,6 +147,13 @@ export function useStore() {
   const [archivedPeriods, setArchivedPeriods] = useState([]);
   const [loading,         setLoading]         = useState(false); // No bloquea si ya hay datos
   const [error,           setError]           = useState(null);
+  const [incomingOrderAlert, setIncomingOrderAlert] = useState(null);
+
+  // Parpadeo del título de la pestaña cuando hay pedidos pendientes
+  useEffect(() => {
+    const pendingCount = (orders || []).filter(o => o.status === 'pending').length;
+    updateTabTitleAlert(pendingCount);
+  }, [orders]);
 
   // activeAdminId se guarda solo en localStorage (es local a cada dispositivo)
   useEffect(() => {
@@ -254,10 +262,20 @@ export function useStore() {
         const { data } = await supabase.from('payments').select('*').order('date', { ascending: false });
         if (data) setPayments(data.map(mapPayment));
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, async (payload) => {
         try {
           const { data } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
-          if (data) setOrders(data.map(mapOrder));
+          if (data) {
+            const mapped = data.map(mapOrder);
+            setOrders(mapped);
+            // Si llega un nuevo pedido en estado pendiente, alertar con sonido y notificación
+            if (payload?.eventType === 'INSERT' && payload.new?.status === 'pending') {
+              const newOrd = mapped.find(o => o.id === payload.new?.id) || mapOrder(payload.new);
+              playOrderChime();
+              showSystemNotification(newOrd);
+              setIncomingOrderAlert(newOrd);
+            }
+          }
         } catch (e) {}
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'periods' }, async () => {
@@ -315,6 +333,11 @@ export function useStore() {
 
     const mapped = mapOrder(newOrderData);
     setOrders(prev => [mapped, ...prev]);
+
+    // Disparar alertas de nuevo pedido inmediatamente
+    playOrderChime();
+    showSystemNotification(mapped);
+    setIncomingOrderAlert(mapped);
 
     try {
       const stored = JSON.parse(localStorage.getItem('surtimueve_orders_backup') || '[]');
@@ -859,5 +882,8 @@ export function useStore() {
     importBackupJSON,
     resetAllDataToDefault,
     updateAdminPin,
+    incomingOrderAlert,
+    dismissIncomingOrderAlert: () => setIncomingOrderAlert(null),
+    playOrderChime,
   };
 }

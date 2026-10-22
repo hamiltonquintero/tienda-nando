@@ -14,6 +14,7 @@ import DigitalCatalog from './components/DigitalCatalog';
 import OrdersInboxModal from './components/OrdersInboxModal';
 import ShareCatalogModal from './components/ShareCatalogModal';
 import DevCreditBadge from './components/DevCreditBadge';
+import NewOrderAlertBanner from './components/NewOrderAlertBanner';
 
 export default function App() {
   const store = useStore();
@@ -180,6 +181,14 @@ export default function App() {
           onClose={() => setLoginModalOpen(false)}
           onLoginSuccess={handleLoginSuccess}
         />
+        {/* Alerta de nuevo pedido en pantalla */}
+        <NewOrderAlertBanner 
+          order={store.incomingOrderAlert}
+          onOpenOrdersInbox={() => {
+            setLoginModalOpen(true);
+          }}
+          onClose={store.dismissIncomingOrderAlert}
+        />
       </ErrorBoundary>
     );
   }
@@ -267,7 +276,7 @@ export default function App() {
           <Settings 
             admins={store.admins}
             activeAdmin={store.activeAdmin}
-            onSwitchAdminClick={handleOpenSwitchAdmin}
+            onSwitchAdminClick={() => setLoginModalOpen(true)}
             onExportBackup={store.exportBackupJSON}
             onImportBackup={store.importBackupJSON}
             onResetData={store.resetAllDataToDefault}
@@ -385,6 +394,12 @@ export default function App() {
             window.history.pushState(null, '', '?view=catalogo');
           }
         }}
+      />
+      {/* Banner Emergente de Nuevo Pedido en Pantalla */}
+      <NewOrderAlertBanner 
+        order={store.incomingOrderAlert}
+        onOpenOrdersInbox={() => setIsOrdersInboxOpen(true)}
+        onClose={store.dismissIncomingOrderAlert}
       />
       {/* Badge Flotante Animado con Colores y Movimiento */}
       <DevCreditBadge isCatalog={false} />

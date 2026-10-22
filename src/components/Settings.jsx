@@ -1,9 +1,15 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Shield, Users, Download, Upload, Smartphone, 
   RefreshCw, CheckCircle, Lock, AlertTriangle, KeyRound, Wifi, Eye, EyeOff, X,
-  Share2, Copy, Check
+  Share2, Copy, Check, Bell, Volume2, VolumeX, Sparkles
 } from 'lucide-react';
+import { 
+  playOrderChime, 
+  requestNotificationPermission, 
+  getNotificationPermissionStatus, 
+  showSystemNotification 
+} from '../utils/orderNotification';
 
 export default function Settings({ 
   admins, 
@@ -27,6 +33,14 @@ export default function Settings({
   const [showCurrent, setShowCurrent] = useState(false);
   const [showNew, setShowNew] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+
+  // Estado de permisos de notificación
+  const [notifPermission, setNotifPermission] = useState(() => getNotificationPermissionStatus());
+  const [testAlertToast, setTestAlertToast] = useState('');
+
+  useEffect(() => {
+    setNotifPermission(getNotificationPermissionStatus());
+  }, []);
 
   // Reset modal state
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -179,7 +193,7 @@ export default function Settings({
                       Cambiar a este Administrador
                     </button>
                   )}
-                  {/* Cambiar PIN — solo disponible para el admin activo */}
+                  {/* Cambiar Contraseña — solo disponible para el admin activo */}
                   {isActive && (
                     <button 
                       className="btn btn-secondary"
@@ -187,13 +201,150 @@ export default function Settings({
                       onClick={() => handleOpenPinModal(admin)}
                     >
                       <Lock size={14} />
-                      Cambiar mi PIN
+                      Cambiar mi Contraseña
                     </button>
                   )}
                 </div>
               </div>
             );
           })}
+        </div>
+      </div>
+
+      {/* 2. ALERTAS Y NOTIFICACIONES DE NUEVOS PEDIDOS */}
+      <div className="card" style={{ borderLeft: '4px solid #0284c7', background: '#ffffff' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px', color: '#0369a1' }}>
+              <Bell size={18} color="#0284c7" />
+              Alertas y Notificaciones de Pedidos
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '14px', maxWidth: '600px', lineHeight: 1.5 }}>
+              Cuando un compañero de la oficina confirme un pedido desde el catálogo, tu computador o celular te avisará al instante con un <strong>timbre sonoro</strong> y una <strong>notificación en pantalla</strong>, incluso si tienes el navegador minimizado.
+            </p>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px', fontSize: '0.84rem' }}>
+              <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>Estado en este navegador:</span>
+              {notifPermission === 'granted' ? (
+                <span className="badge badge-success" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                  <Check size={12} /> Notificaciones Activadas
+                </span>
+              ) : notifPermission === 'denied' ? (
+                <span className="badge" style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
+                  🚫 Bloqueadas por el navegador
+                </span>
+              ) : (
+                <span className="badge" style={{ background: '#fffbeb', color: '#b45309', border: '1px solid #fde68a' }}>
+                  ⚠️ Pendiente de autorizar
+                </span>
+              )}
+            </div>
+
+            {testAlertToast && (
+              <div style={{
+                background: '#ecfdf5',
+                color: '#065f46',
+                border: '1px solid #a7f3d0',
+                padding: '8px 14px',
+                borderRadius: 'var(--radius-md)',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                marginBottom: '14px',
+                display: 'inline-block'
+              }}>
+                {testAlertToast}
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', minWidth: '220px' }}>
+            <button
+              type="button"
+              className="btn btn-secondary"
+              onClick={() => {
+                playOrderChime();
+                setTestAlertToast('🔊 Timbre de prueba reproducido.');
+                setTimeout(() => setTestAlertToast(''), 3000);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                padding: '10px 14px',
+                fontSize: '0.86rem',
+                fontWeight: 700
+              }}
+            >
+              <Volume2 size={16} color="#0284c7" />
+              <span>Probar Timbre Sonoro</span>
+            </button>
+
+            {notifPermission !== 'granted' ? (
+              <button
+                type="button"
+                className="btn btn-primary"
+                onClick={async () => {
+                  const perm = await requestNotificationPermission();
+                  setNotifPermission(perm);
+                  if (perm === 'granted') {
+                    playOrderChime();
+                    showSystemNotification({
+                      customerName: 'Alejandra / Fernando',
+                      items: [{ quantity: 2, name: 'Papas' }],
+                      total: 5000
+                    });
+                    setTestAlertToast('✅ ¡Notificaciones activadas exitosamente!');
+                  } else {
+                    setTestAlertToast('⚠️ Permiso denegado. Puedes cambiarlo en el candado de la barra de direcciones.');
+                  }
+                  setTimeout(() => setTestAlertToast(''), 4000);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '10px 14px',
+                  fontSize: '0.86rem',
+                  fontWeight: 800
+                }}
+              >
+                <Bell size={16} />
+                <span>Activar Notificaciones</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn"
+                onClick={() => {
+                  playOrderChime();
+                  showSystemNotification({
+                    customerName: 'Prueba de Sistema',
+                    items: [{ quantity: 2, name: 'Coca Cola 400ml' }],
+                    total: 5000
+                  });
+                  setTestAlertToast('🔔 Notificación de prueba enviada al sistema.');
+                  setTimeout(() => setTestAlertToast(''), 3000);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '10px 14px',
+                  fontSize: '0.86rem',
+                  fontWeight: 800,
+                  background: '#f0f9ff',
+                  color: '#0284c7',
+                  border: '1.5px solid #bae6fd'
+                }}
+              >
+                <Sparkles size={16} />
+                <span>Enviar Notificación de Prueba</span>
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
