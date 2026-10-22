@@ -87,6 +87,23 @@ export default function Header({
           <Settings size={18} />
           <span>Ajustes</span>
         </button>
+
+        {/* Botón Catálogo Digital directamente en la barra principal */}
+        <button 
+          type="button"
+          className="nav-tab-btn"
+          style={{ 
+            background: '#ecfdf5', 
+            color: '#059669', 
+            border: '1.5px solid #a7f3d0', 
+            fontWeight: 700 
+          }}
+          onClick={onOpenShareCatalog}
+          title="Compartir enlace del Catálogo Digital con la oficina"
+        >
+          <Share2 size={18} color="#059669" />
+          <span>Catálogo Digital</span>
+        </button>
       </nav>
 
       {/* Right side: Orders inbox, Share catalog, Period badge & Admin pill */}

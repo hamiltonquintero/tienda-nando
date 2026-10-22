@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { 
   Shield, Users, Download, Upload, Smartphone, 
-  RefreshCw, CheckCircle, Lock, AlertTriangle, KeyRound, Wifi, Eye, EyeOff, X
+  RefreshCw, CheckCircle, Lock, AlertTriangle, KeyRound, Wifi, Eye, EyeOff, X,
+  Share2, Copy, Check
 } from 'lucide-react';
 
 export default function Settings({ 
@@ -11,7 +12,8 @@ export default function Settings({
   onExportBackup, 
   onImportBackup, 
   onResetData,
-  onUpdateAdminPin
+  onUpdateAdminPin,
+  onOpenShareCatalog
 }) {
   const [importStatus, setImportStatus] = useState('');
 
@@ -192,7 +194,44 @@ export default function Settings({
         </div>
       </div>
 
-      {/* 2. CÓMO USAR EN LOS 2 TELÉFONOS */}
+      {/* 2. CATÁLOGO DIGITAL PARA COMPAÑEROS */}
+      <div className="card" style={{ borderLeft: '4px solid #059669', background: '#ffffff' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px' }}>
+          <div>
+            <h3 style={{ fontSize: '1.05rem', fontWeight: 800, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px', color: '#065f46' }}>
+              <Share2 size={18} color="#059669" />
+              Catálogo Digital de Oficina
+            </h3>
+            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '8px', maxWidth: '580px', lineHeight: 1.5 }}>
+              Comparte el enlace público con tus compañeros de la oficina por WhatsApp. Ellos verán solo el catálogo con fotos, precios y stock disponible para hacer pedidos desde sus puestos sin tener acceso a tus costos, ganancias ni reportes.
+            </p>
+          </div>
+          {onOpenShareCatalog && (
+            <button
+              type="button"
+              className="btn"
+              onClick={onOpenShareCatalog}
+              style={{
+                background: '#059669',
+                color: '#ffffff',
+                padding: '9px 18px',
+                fontSize: '0.86rem',
+                fontWeight: 800,
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 4px 12px rgba(5, 150, 105, 0.25)',
+                cursor: 'pointer'
+              }}
+            >
+              <Share2 size={16} />
+              <span>Ver y Copiar Enlace</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* 3. CÓMO USAR EN LOS 2 TELÉFONOS */}
       <div className="card" style={{ borderLeft: '4px solid #16a34a', background: '#ffffff' }}>
         <h3 style={{ fontSize: '1.05rem', fontWeight: 700, marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Smartphone size={18} color="#16a34a" />

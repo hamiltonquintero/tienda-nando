@@ -248,6 +248,7 @@ export default function App() {
             onImportBackup={store.importBackupJSON}
             onResetData={store.resetAllDataToDefault}
             onUpdateAdminPin={store.updateAdminPin}
+            onOpenShareCatalog={() => setIsShareCatalogOpen(true)}
           />
         )}
       </main>

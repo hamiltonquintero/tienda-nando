@@ -331,6 +331,72 @@ export default function POS({
           </div>
         )}
 
+        {/* Banner Destacado: Compartir Catálogo Digital con la Oficina */}
+        {onOpenShareCatalog && (
+          <div style={{
+            background: 'linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%)',
+            border: '1.5px solid #86efac',
+            borderRadius: 'var(--radius-lg)',
+            padding: '12px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: '12px',
+            marginBottom: '16px',
+            boxShadow: '0 4px 12px rgba(22, 163, 74, 0.08)',
+            flexWrap: 'wrap'
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              <div style={{
+                width: '40px',
+                height: '40px',
+                borderRadius: '12px',
+                background: '#16a34a',
+                color: '#ffffff',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: '1.3rem',
+                flexShrink: 0,
+                boxShadow: '0 2px 8px rgba(22, 163, 74, 0.25)'
+              }}>
+                🛍️
+              </div>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: '0.94rem', color: '#14532d' }}>
+                  Catálogo Digital para la Oficina
+                </div>
+                <div style={{ fontSize: '0.8rem', color: '#166534' }}>
+                  Comparte el link con tus compañeros para que puedan pedir y comprar desde su puesto
+                </div>
+              </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={onOpenShareCatalog}
+                className="btn"
+                style={{
+                  background: '#16a34a',
+                  color: '#ffffff',
+                  padding: '8px 16px',
+                  fontSize: '0.86rem',
+                  fontWeight: 800,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: '0 2px 8px rgba(22, 163, 74, 0.25)',
+                  cursor: 'pointer'
+                }}
+              >
+                <Share2 size={16} />
+                <span>🔗 Compartir Enlace / WhatsApp</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Search & Categories Bar */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
           <div style={{ display: 'flex', gap: '10px' }}>
