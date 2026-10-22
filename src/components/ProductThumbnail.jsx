@@ -4,8 +4,18 @@ import React, { useState } from 'react';
  * ProductThumbnail
  * Muestra la imagen real del producto si es una URL, Base64 o ruta pública.
  * Si no hay imagen o falla la carga, muestra el sticker/emoji con respaldo a '📦'.
+ * Soporta dimensiones fijas o porcentaje (ej. width: '100%', height: '140px').
  */
-export default function ProductThumbnail({ icon, name = 'Producto', size = 46, style = {}, className = '' }) {
+export default function ProductThumbnail({ 
+  icon, 
+  name = 'Producto', 
+  size = 46, 
+  width, 
+  height, 
+  fit = 'contain', 
+  style = {}, 
+  className = '' 
+}) {
   const [hasError, setHasError] = useState(false);
 
   const isImg = Boolean(
@@ -18,8 +28,13 @@ export default function ProductThumbnail({ icon, name = 'Producto', size = 46, s
     )
   );
 
-  const widthStyle = typeof size === 'number' ? `${size}px` : size;
-  const heightStyle = typeof size === 'number' ? `${size}px` : size;
+  const widthStyle = width !== undefined 
+    ? (typeof width === 'number' ? `${width}px` : width) 
+    : (typeof size === 'number' ? `${size}px` : size);
+
+  const heightStyle = height !== undefined 
+    ? (typeof height === 'number' ? `${height}px` : height) 
+    : (typeof size === 'number' ? `${size}px` : size);
 
   if (isImg && !hasError) {
     return (
@@ -31,11 +46,9 @@ export default function ProductThumbnail({ icon, name = 'Producto', size = 46, s
         style={{
           width: widthStyle,
           height: heightStyle,
-          objectFit: 'contain',
+          objectFit: fit,
           borderRadius: '10px',
-          background: '#ffffff',
-          border: '1px solid #e2e8f0',
-          padding: '2px',
+          background: 'transparent',
           flexShrink: 0,
           ...style
         }}
@@ -46,6 +59,14 @@ export default function ProductThumbnail({ icon, name = 'Producto', size = 46, s
   // Fallback a emoji o sticker
   const emoji = (icon && !isImg) ? icon : '📦';
 
+  // Calcular tamaño de fuente proporcional si el alto es numérico
+  let fontSizeStyle = '1.6rem';
+  if (typeof height === 'number') {
+    fontSizeStyle = `${Math.min(64, Math.round(height * 0.45))}px`;
+  } else if (typeof size === 'number') {
+    fontSizeStyle = `${Math.round(size * 0.55)}px`;
+  }
+
   return (
     <span
       className={className}
@@ -55,11 +76,10 @@ export default function ProductThumbnail({ icon, name = 'Producto', size = 46, s
         justifyContent: 'center',
         width: widthStyle,
         height: heightStyle,
-        fontSize: typeof size === 'number' ? `${Math.round(size * 0.55)}px` : '1.6rem',
+        fontSize: fontSizeStyle,
         lineHeight: 1,
         borderRadius: '10px',
-        background: '#f8fafc',
-        border: '1px solid #e2e8f0',
+        background: 'transparent',
         flexShrink: 0,
         userSelect: 'none',
         ...style

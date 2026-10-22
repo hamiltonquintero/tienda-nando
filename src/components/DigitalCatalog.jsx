@@ -266,7 +266,7 @@ ${itemsList}
       </header>
 
       {/* Main Content */}
-      <main style={{ maxWidth: '1000px', margin: '0 auto', padding: '16px 20px' }}>
+      <main className="catalog-container">
         {/* Banner de Bienvenida */}
         <div style={{
           background: 'linear-gradient(135deg, #0284c7 0%, #0369a1 100%)',
@@ -344,11 +344,7 @@ ${itemsList}
         </div>
 
         {/* Product Catalog Grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-          gap: '14px'
-        }}>
+        <div className="catalog-grid">
           {filteredProducts.map(p => {
             const inCart = cart.find(it => it.id === p.id);
             const isOutOfStock = p.stock <= 0;
@@ -357,44 +353,60 @@ ${itemsList}
             return (
               <div 
                 key={p.id}
-                style={{
-                  background: '#ffffff',
-                  border: inCart ? '2px solid var(--brand-blue)' : '1px solid var(--border-subtle)',
-                  borderRadius: 'var(--radius-lg)',
-                  padding: '14px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  justifyContent: 'space-between',
-                  boxShadow: inCart ? '0 4px 14px rgba(2, 132, 199, 0.15)' : 'var(--shadow-sm)',
-                  opacity: isOutOfStock ? 0.6 : 1,
-                  transition: 'all 0.15s ease'
-                }}
+                className={`catalog-card ${inCart ? 'in-cart' : ''}`}
+                style={{ opacity: isOutOfStock ? 0.6 : 1 }}
               >
                 <div>
-                  {/* Top: Icon & Stock Badge */}
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                    <ProductThumbnail icon={p.icon} name={p.name} size={58} />
+                  {/* Top: Large Photo Box with Floating Stock Badge */}
+                  <div className="catalog-card-image-wrap">
+                    <ProductThumbnail 
+                      icon={p.icon} 
+                      name={p.name} 
+                      width="100%" 
+                      height="100%" 
+                      fit="contain"
+                    />
 
-                    {isOutOfStock ? (
-                      <span className="badge badge-danger" style={{ fontSize: '0.68rem' }}>Agotado</span>
-                    ) : isLowStock ? (
-                      <span className="badge badge-warning" style={{ fontSize: '0.68rem' }}>Últimas {p.stock}</span>
-                    ) : (
-                      <span className="badge badge-success" style={{ fontSize: '0.68rem' }}>Disponible</span>
-                    )}
+                    {/* Floating Stock Badge */}
+                    <div style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 2 }}>
+                      {isOutOfStock ? (
+                        <span className="badge badge-danger" style={{ fontSize: '0.68rem', boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }}>
+                          Agotado
+                        </span>
+                      ) : isLowStock ? (
+                        <span className="badge badge-warning" style={{ fontSize: '0.68rem', boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }}>
+                          Últimas {p.stock}
+                        </span>
+                      ) : (
+                        <span className="badge badge-success" style={{ fontSize: '0.68rem', boxShadow: '0 2px 6px rgba(0,0,0,0.1)' }}>
+                          Disponible
+                        </span>
+                      )}
+                    </div>
                   </div>
 
                   {/* Name & Category */}
-                  <div style={{ fontWeight: 800, fontSize: '0.94rem', color: 'var(--text-main)', lineHeight: 1.3, marginBottom: '4px' }}>
+                  <div style={{ 
+                    fontWeight: 800, 
+                    fontSize: '0.96rem', 
+                    color: 'var(--text-main)', 
+                    lineHeight: 1.3, 
+                    marginBottom: '3px',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    minHeight: '2.4em'
+                  }}>
                     {p.name}
                   </div>
-                  <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', marginBottom: '10px' }}>
+                  <div style={{ fontSize: '0.74rem', color: 'var(--text-dim)', marginBottom: '8px' }}>
                     {p.category}
                   </div>
                 </div>
 
                 {/* Bottom: Price & Add Button */}
-                <div>
+                <div style={{ marginTop: 'auto', paddingTop: '6px' }}>
                   <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--brand-blue)', marginBottom: '8px' }}>
                     {formatCOP(p.price)}
                   </div>
@@ -405,27 +417,27 @@ ${itemsList}
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       background: '#f0f9ff',
-                      border: '1px solid #bae6fd',
+                      border: '1.5px solid #bae6fd',
                       borderRadius: 'var(--radius-md)',
                       padding: '4px 6px'
                     }}>
                       <button
                         type="button"
                         onClick={() => updateQuantity(p.id, -1)}
-                        style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#fff', border: '1px solid #cbd5e1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        style={{ width: '30px', height: '30px', borderRadius: '6px', background: '#fff', border: '1px solid #cbd5e1', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       >
-                        <Minus size={13} />
+                        <Minus size={14} />
                       </button>
-                      <span style={{ fontWeight: 800, fontSize: '0.92rem', color: 'var(--brand-blue)' }}>
+                      <span style={{ fontWeight: 800, fontSize: '0.95rem', color: 'var(--brand-blue)' }}>
                         {inCart.quantity}
                       </span>
                       <button
                         type="button"
                         onClick={() => updateQuantity(p.id, 1)}
                         disabled={inCart.quantity >= p.stock}
-                        style={{ width: '28px', height: '28px', borderRadius: '6px', background: '#fff', border: '1px solid #cbd5e1', cursor: inCart.quantity >= p.stock ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                        style={{ width: '30px', height: '30px', borderRadius: '6px', background: '#fff', border: '1px solid #cbd5e1', cursor: inCart.quantity >= p.stock ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                       >
-                        <Plus size={13} />
+                        <Plus size={14} />
                       </button>
                     </div>
                   ) : (
@@ -435,22 +447,24 @@ ${itemsList}
                       onClick={() => addToCart(p)}
                       style={{
                         width: '100%',
-                        padding: '8px',
+                        padding: '10px 12px',
                         borderRadius: 'var(--radius-md)',
                         background: isOutOfStock ? '#e2e8f0' : 'var(--brand-blue)',
                         color: isOutOfStock ? '#94a3b8' : '#ffffff',
                         border: 'none',
-                        fontWeight: 700,
-                        fontSize: '0.84rem',
+                        fontWeight: 800,
+                        fontSize: '0.9rem',
                         cursor: isOutOfStock ? 'not-allowed' : 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '6px'
+                        gap: '6px',
+                        boxShadow: isOutOfStock ? 'none' : '0 2px 8px rgba(2, 132, 199, 0.25)',
+                        transition: 'transform 0.1s ease'
                       }}
                     >
-                      <Plus size={14} />
-                      {isOutOfStock ? 'Sin stock' : 'Pedir'}
+                      <Plus size={16} />
+                      <span>{isOutOfStock ? 'Sin stock' : 'Pedir'}</span>
                     </button>
                   )}
                 </div>
