@@ -159,9 +159,12 @@ export default function Settings({
                   <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
                     {admin.role}
                   </div>
-                  <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <div style={{ fontSize: '0.78rem', color: '#0284c7', fontWeight: 700, marginTop: '6px' }}>
+                    Usuario: <strong>{admin.username || admin.name}</strong>
+                  </div>
+                  <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                     <Lock size={12} />
-                    PIN de acceso: •••• (Personalizado)
+                    Contraseña de acceso: •••••••• (Protegida)
                   </div>
                 </div>
 
@@ -337,19 +340,18 @@ export default function Settings({
               {/* PIN actual */}
               <div>
                 <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                  PIN actual: *
+                  Contraseña actual: *
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type={showCurrent ? 'text' : 'password'}
                     className="input"
                     required
-                    maxLength={8}
                     autoFocus
-                    placeholder="••••"
+                    placeholder="Contraseña actual"
                     value={currentPin}
                     onChange={(e) => { setCurrentPin(e.target.value); setPinError(''); }}
-                    style={{ paddingRight: '44px', letterSpacing: '0.3em', fontWeight: 700 }}
+                    style={{ paddingRight: '44px', fontWeight: 700 }}
                   />
                   <button type="button" onClick={() => setShowCurrent(v => !v)}
                     style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
@@ -361,18 +363,17 @@ export default function Settings({
               {/* Nuevo PIN */}
               <div>
                 <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                  Nuevo PIN (mínimo 4 dígitos): *
+                  Nueva contraseña (mínimo 4 caracteres): *
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type={showNew ? 'text' : 'password'}
                     className="input"
                     required
-                    maxLength={8}
-                    placeholder="••••"
+                    placeholder="Nueva contraseña"
                     value={newPin}
                     onChange={(e) => { setNewPin(e.target.value); setPinError(''); }}
-                    style={{ paddingRight: '44px', letterSpacing: '0.3em', fontWeight: 700 }}
+                    style={{ paddingRight: '44px', fontWeight: 700 }}
                   />
                   <button type="button" onClick={() => setShowNew(v => !v)}
                     style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>
@@ -384,18 +385,17 @@ export default function Settings({
               {/* Confirmar nuevo PIN */}
               <div>
                 <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                  Confirmar nuevo PIN: *
+                  Confirmar nueva contraseña: *
                 </label>
                 <div style={{ position: 'relative' }}>
                   <input
                     type={showConfirm ? 'text' : 'password'}
                     className="input"
                     required
-                    maxLength={8}
-                    placeholder="••••"
+                    placeholder="Repite la nueva contraseña"
                     value={confirmPin}
                     onChange={(e) => { setConfirmPin(e.target.value); setPinError(''); }}
-                    style={{ paddingRight: '44px', letterSpacing: '0.3em', fontWeight: 700 }}
+                    style={{ paddingRight: '44px', fontWeight: 700 }}
                   />
                   <button type="button" onClick={() => setShowConfirm(v => !v)}
                     style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)' }}>

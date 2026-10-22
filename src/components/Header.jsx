@@ -1,11 +1,12 @@
 import React from 'react';
-import { ShoppingBag, Users, Package, BarChart3, Settings, ShieldCheck, Calendar, Inbox, Share2 } from 'lucide-react';
+import { ShoppingBag, Users, Package, BarChart3, Settings, ShieldCheck, Calendar, Inbox, Share2, LogOut } from 'lucide-react';
 
 export default function Header({ 
   activeTab, 
   setActiveTab, 
   activeAdmin, 
   onSwitchAdminClick,
+  onLogout,
   currentPeriod,
   totalPendingDebt,
   cartCount,
@@ -197,6 +198,31 @@ export default function Header({
           <ShieldCheck size={15} />
           <span>{activeAdmin.name.split(' ')[0]}</span>
         </button>
+
+        {onLogout && (
+          <button
+            type="button"
+            onClick={onLogout}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '5px',
+              padding: '7px 12px',
+              borderRadius: '999px',
+              border: '1.5px solid #fecaca',
+              background: '#fef2f2',
+              color: '#dc2626',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease'
+            }}
+            title="Cerrar sesión de administrador y regresar al Catálogo"
+          >
+            <LogOut size={14} />
+            <span>Salir</span>
+          </button>
+        )}
       </div>
     </header>
   );

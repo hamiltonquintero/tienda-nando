@@ -50,8 +50,8 @@ export const CATEGORIES = [
 ];
 
 export const INITIAL_ADMINS = [
-  { id: 'admin-1', name: 'Administrador 1 (Nando)', pin: '1234', role: 'Administrador Principal' },
-  { id: 'admin-2', name: 'Administrador 2 (Socio)', pin: '5678', role: 'Administrador' }
+  { id: 'admin-1', username: 'Alejandra', name: 'Alejandra', pin: '1053830140', role: 'Administrador Principal' },
+  { id: 'admin-2', username: 'Fernando', name: 'Fernando', pin: '2417', role: 'Administrador' }
 ];
 
 export const INITIAL_CUSTOMERS = [

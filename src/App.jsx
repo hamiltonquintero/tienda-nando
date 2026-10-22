@@ -9,6 +9,7 @@ import Inventory from './components/Inventory';
 import Reports from './components/Reports';
 import Settings from './components/Settings';
 import PinModal from './components/PinModal';
+import AdminLoginModal from './components/AdminLoginModal';
 import DigitalCatalog from './components/DigitalCatalog';
 import OrdersInboxModal from './components/OrdersInboxModal';
 import ShareCatalogModal from './components/ShareCatalogModal';
@@ -20,22 +21,42 @@ export default function App() {
   const [cart, setCart] = useState([]);
   const [selectedCustomerId, setSelectedCustomerId] = useState('');
   const [saleType, setSaleType] = useState('contado');
-  const [pinModalState, setPinModalState] = useState({ isOpen: false, targetAdmin: null });
 
-  // Estado para Catálogo Digital y Pedidos
+  // Sesión de Administrador Autenticado (Alejandra / Fernando)
+  const [authAdminId, setAuthAdminId] = useState(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem('surtimueve_auth_admin') || null;
+  });
+  const [loginModalOpen, setLoginModalOpen] = useState(false);
+
+  // Estado para Catálogo Digital: Por defecto SIEMPRE abre en Catálogo para los compañeros
+  // A menos que un administrador ya tenga sesión iniciada y la URL no pida expresamente catálogo
   const [isCatalogView, setIsCatalogView] = useState(() => {
-    if (typeof window === 'undefined') return false;
+    if (typeof window === 'undefined') return true;
+    const hasAuth = !!localStorage.getItem('surtimueve_auth_admin');
+    if (!hasAuth) return true;
     return window.location.search.includes('view=catalogo') || window.location.hash === '#catalogo';
   });
   const [isOrdersInboxOpen, setIsOrdersInboxOpen] = useState(false);
   const [isShareCatalogOpen, setIsShareCatalogOpen] = useState(false);
-  const [catalogPinModalOpen, setCatalogPinModalOpen] = useState(false);
+
+  // Sincronizar activeAdmin de la tienda con la sesión guardada
+  useEffect(() => {
+    if (authAdminId && store.admins.some(a => a.id === authAdminId)) {
+      store.setActiveAdminId(authAdminId);
+    }
+  }, [authAdminId, store.admins]);
 
   // Escuchar cambios de URL para soportar compartir enlace
   useEffect(() => {
     const handlePopState = () => {
       const isCat = window.location.search.includes('view=catalogo') || window.location.hash === '#catalogo';
-      setIsCatalogView(isCat);
+      const hasAuth = !!localStorage.getItem('surtimueve_auth_admin');
+      if (!hasAuth) {
+        setIsCatalogView(true);
+      } else {
+        setIsCatalogView(isCat);
+      }
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -121,22 +142,29 @@ export default function App() {
   const cartTotalItems = cart.reduce((acc, it) => acc + it.quantity, 0);
   const pendingOrdersCount = (store.orders || []).filter(o => o.status === 'pending').length;
 
-  // Switch Admin Handlers
-  const handleOpenSwitchAdmin = (targetAdmin = null) => {
-    // If no specific target provided, toggle to the other admin
-    const nextAdmin = targetAdmin || store.admins.find(a => a.id !== store.activeAdmin.id) || store.admins[0];
-    setPinModalState({
-      isOpen: true,
-      targetAdmin: nextAdmin
-    });
+  // Handlers de autenticación segura
+  const handleLoginSuccess = (admin) => {
+    localStorage.setItem('surtimueve_auth_admin', admin.id);
+    setAuthAdminId(admin.id);
+    store.setActiveAdminId(admin.id);
+    setIsCatalogView(false);
+    setLoginModalOpen(false);
+    if (window.history.pushState) {
+      window.history.pushState(null, '', window.location.pathname);
+    }
   };
 
-  const handleAdminVerified = (newAdminId) => {
-    store.setActiveAdminId(newAdminId);
+  const handleLogout = () => {
+    localStorage.removeItem('surtimueve_auth_admin');
+    setAuthAdminId(null);
+    setIsCatalogView(true);
+    if (window.history.pushState) {
+      window.history.pushState(null, '', '?view=catalogo');
+    }
   };
 
-  // ── Vista Pública: Catálogo Digital para Compañeros ──────
-  if (isCatalogView) {
+  // ── Vista Pública: Catálogo Digital para Compañeros (Por defecto si no hay sesión) ──────
+  if (isCatalogView || !authAdminId) {
     return (
       <ErrorBoundary>
         <DigitalCatalog 
@@ -144,19 +172,13 @@ export default function App() {
           customers={store.customers}
           onAddCustomer={store.addCustomer}
           onCreateOrder={store.createOrder}
-          onSwitchToAdmin={() => setCatalogPinModalOpen(true)}
+          onSwitchToAdmin={() => setLoginModalOpen(true)}
         />
-        <PinModal 
-          isOpen={catalogPinModalOpen}
-          targetAdmin={store.activeAdmin || store.admins[0]}
-          onClose={() => setCatalogPinModalOpen(false)}
-          onVerified={() => {
-            setCatalogPinModalOpen(false);
-            setIsCatalogView(false);
-            if (window.history.pushState) {
-              window.history.pushState(null, '', window.location.pathname);
-            }
-          }}
+        <AdminLoginModal 
+          isOpen={loginModalOpen}
+          admins={store.admins}
+          onClose={() => setLoginModalOpen(false)}
+          onLoginSuccess={handleLoginSuccess}
         />
       </ErrorBoundary>
     );
@@ -170,7 +192,8 @@ export default function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         activeAdmin={store.activeAdmin}
-        onSwitchAdminClick={() => handleOpenSwitchAdmin()}
+        onSwitchAdminClick={() => setLoginModalOpen(true)}
+        onLogout={handleLogout}
         currentPeriod={store.currentPeriod}
         totalPendingDebt={totalPendingDebt}
         cartCount={cartTotalItems}
@@ -334,12 +357,12 @@ export default function App() {
         </button>
       </nav>
 
-      {/* Admin Switch PIN Modal */}
-      <PinModal 
-        isOpen={pinModalState.isOpen}
-        targetAdmin={pinModalState.targetAdmin}
-        onClose={() => setPinModalState({ isOpen: false, targetAdmin: null })}
-        onVerified={handleAdminVerified}
+      {/* Admin Switch Login Modal */}
+      <AdminLoginModal 
+        isOpen={loginModalOpen}
+        admins={store.admins}
+        onClose={() => setLoginModalOpen(false)}
+        onLoginSuccess={handleLoginSuccess}
       />
 
       {/* Bandeja de Pedidos del Catálogo */}

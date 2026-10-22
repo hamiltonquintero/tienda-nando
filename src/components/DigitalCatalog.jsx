@@ -254,17 +254,22 @@ Quedo atento cuando lo tengas listo. ¡Muchas gracias! 🙌`;
               display: 'flex', 
               alignItems: 'center', 
               gap: '6px', 
-              fontSize: '0.76rem', 
-              color: 'var(--text-muted)',
-              border: '1px solid #cbd5e1',
+              fontSize: '0.80rem', 
+              fontWeight: 700,
+              color: '#0369a1',
+              background: '#f0f9ff',
+              border: '1.5px solid #bae6fd',
               borderRadius: '999px',
-              padding: '6px 12px'
+              padding: '7px 14px',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              boxShadow: '0 1px 3px rgba(2, 132, 199, 0.1)'
             }}
             onClick={onSwitchToAdmin}
-            title="Ingreso para el dueño / administrador con PIN"
+            title="Ingreso protegido para administradores con usuario y contraseña"
           >
-            <Lock size={13} />
-            <span>Soy el Dueño</span>
+            <Lock size={14} color="#0284c7" />
+            <span>Ingreso Administrador</span>
           </button>
         </div>
       </header>
