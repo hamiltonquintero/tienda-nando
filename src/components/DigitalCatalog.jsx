@@ -5,7 +5,7 @@ import {
   MapPin, Phone, CreditCard, DollarSign, X, Check
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { CATEGORIES } from '../data/initialProducts';
+import { CATEGORIES, STORE_OWNER_PHONE } from '../data/initialProducts';
 import { formatCOP } from '../data/store';
 import ProductThumbnail from './ProductThumbnail';
 
@@ -207,7 +207,9 @@ ${itemsList}
 
 ¡Muchas gracias! 🙌`;
 
-    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+    const cleanPhone = (STORE_OWNER_PHONE || '573174374336').replace(/\D/g, '');
+    const destinationNumber = cleanPhone.startsWith('57') ? cleanPhone : `57${cleanPhone}`;
+    const url = `https://wa.me/${destinationNumber}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
   };
 

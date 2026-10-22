@@ -59,3 +59,6 @@ export const INITIAL_CUSTOMERS = [
   { id: 'cust-2', name: 'María Fernanda Gómez', area: 'Recursos Humanos', phone: '3109876543', totalDebt: 0 },
   { id: 'cust-3', name: 'Andrés Felipe Pérez', area: 'Sistemas / TI', phone: '3205554321', totalDebt: 0 }
 ];
+
+export const STORE_OWNER_PHONE = '573174374336';
+
