@@ -185,27 +185,28 @@ export default function DigitalCatalog({
   const handleSendWhatsAppToOwner = () => {
     if (!orderSuccess) return;
     const itemsList = orderSuccess.items
-      .map(it => `• ${it.quantity} ${it.name} (${formatCOP(it.price * it.quantity)})`)
+      .map(it => `  ▪️ ${it.quantity}x ${it.name} - ${formatCOP(it.price * it.quantity)}`)
       .join('\n');
 
-    let pagoDesc = 'De Contado en efectivo';
+    let pagoDesc = '💵 Contado en efectivo';
     if (orderSuccess.paymentType === 'fiado') {
-      pagoDesc = 'Fiado a quincena';
+      pagoDesc = '📝 Fiado a quincena';
     } else if (orderSuccess.paymentMethod === 'nequi') {
-      pagoDesc = 'Transferencia Nequi';
+      pagoDesc = '📲 Transferencia Nequi';
     } else if (orderSuccess.paymentMethod === 'daviplata') {
-      pagoDesc = 'Transferencia Daviplata';
+      pagoDesc = '📲 Transferencia Daviplata';
     }
 
-    const message = `¡Hola Hamilton! 👋 Acabo de hacer un pedido desde el *Catálogo Digital Surtimueve Más*:
+    const message = `👋 ¡Hola! Quiero *confirmar mi pedido* de Surtimueve Más:
 
+🛍️ *PRODUCTOS SOLICITADOS:*
 ${itemsList}
 
-💰 *Total a pagar:* *${formatCOP(orderSuccess.total)}*
-💳 *Forma de pago:* ${pagoDesc}
-👤 *Para:* *${orderSuccess.customerName}* ${orderSuccess.customerArea ? `(${orderSuccess.customerArea})` : ''}
+💰 *TOTAL A PAGAR:* *${formatCOP(orderSuccess.total)}*
+💳 *FORMA DE PAGO:* ${pagoDesc}
+👤 *PEDIDO POR:* *${orderSuccess.customerName}*${orderSuccess.customerArea ? `\n📍 *UBICACIÓN / ÁREA:* ${orderSuccess.customerArea}` : ''}
 
-¡Muchas gracias! 🙌`;
+Quedo atento cuando lo tengas listo. ¡Muchas gracias! 🙌`;
 
     const cleanPhone = (STORE_OWNER_PHONE || '573174374336').replace(/\D/g, '');
     const destinationNumber = cleanPhone.startsWith('57') ? cleanPhone : `57${cleanPhone}`;
@@ -241,6 +242,9 @@ ${itemsList}
               </div>
               <div style={{ fontSize: '0.74rem', color: 'var(--text-muted)', fontWeight: 600 }}>
                 Catálogo Digital de Oficina · Pide desde tu puesto
+              </div>
+              <div style={{ fontSize: '0.70rem', color: '#64748b', fontWeight: 600, marginTop: '1px' }}>
+                Desarrollado por <strong style={{ color: '#0284c7' }}>Hamilton Q.</strong>
               </div>
             </div>
           </div>
@@ -481,6 +485,21 @@ ${itemsList}
             <p style={{ fontSize: '0.84rem' }}>Prueba con otra palabra o revisa otra categoría.</p>
           </div>
         )}
+
+        {/* Footer con crédito permanente */}
+        <footer style={{
+          textAlign: 'center',
+          padding: '24px 16px',
+          marginTop: '36px',
+          borderTop: '1px solid #e2e8f0',
+          fontSize: '0.78rem',
+          color: '#64748b'
+        }}>
+          <div><strong>Surtimueve más</strong> · Catálogo Digital de Oficina</div>
+          <div style={{ marginTop: '5px', fontSize: '0.74rem' }}>
+            Desarrollado por <strong style={{ color: '#0284c7' }}>Hamilton Q.</strong>
+          </div>
+        </footer>
       </main>
 
       {/* FLOATING BOTTOM CART BAR */}
@@ -887,7 +906,7 @@ ${itemsList}
                   color: '#ffffff',
                   fontWeight: 800,
                   fontSize: '0.96rem',
-                  padding: '12px',
+                  padding: '13px',
                   borderRadius: 'var(--radius-md)',
                   boxShadow: '0 4px 14px rgba(37, 211, 102, 0.4)',
                   display: 'flex',
@@ -899,7 +918,7 @@ ${itemsList}
                 }}
               >
                 <MessageSquare size={18} />
-                Avisar a Hamilton por WhatsApp
+                Confirmar pedido por WhatsApp
               </button>
 
               <button

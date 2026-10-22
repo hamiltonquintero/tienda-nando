@@ -251,6 +251,21 @@ export default function App() {
             onOpenShareCatalog={() => setIsShareCatalogOpen(true)}
           />
         )}
+
+        {/* Footer permanente */}
+        <footer style={{
+          textAlign: 'center',
+          padding: '16px',
+          marginTop: '28px',
+          borderTop: '1px solid var(--border-subtle)',
+          fontSize: '0.76rem',
+          color: '#64748b'
+        }}>
+          <div><strong>Surtimueve más</strong> · Sistema de Gestión y Ventas</div>
+          <div style={{ marginTop: '4px', fontSize: '0.72rem' }}>
+            Desarrollado por <strong style={{ color: '#0284c7' }}>Hamilton Q.</strong>
+          </div>
+        </footer>
       </main>
 
       {/* Mobile Bottom Navigation Bar */}
