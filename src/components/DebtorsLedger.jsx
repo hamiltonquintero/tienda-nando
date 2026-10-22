@@ -2,7 +2,8 @@ import React, { useState, useMemo } from 'react';
 import { 
   Users, Search, UserPlus, DollarSign, MessageSquare, 
   Receipt, ArrowRight, CheckCircle2, AlertCircle, Phone, 
-  Sparkles, History, Calendar, Trash2, Pencil
+  Sparkles, History, Calendar, Trash2, Pencil, ShoppingCart,
+  Table as TableIcon, LayoutGrid
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { formatCOP } from '../data/store';
@@ -17,10 +18,12 @@ export default function DebtorsLedger({
   onAddCustomer,
   onUpdateCustomer,
   onDeleteCustomer,
+  onFiarToCustomer,
   activeAdmin
 }) {
   const [search, setSearch] = useState('');
-  const [filterMode, setFilterMode] = useState('withDebt'); // 'withDebt' | 'all'
+  const [filterMode, setFilterMode] = useState('all'); // 'all' | 'withDebt' | 'noDebt'
+  const [viewMode, setViewMode] = useState('table'); // 'table' | 'cards'
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentAmount, setPaymentAmount] = useState('');
@@ -58,11 +61,19 @@ export default function DebtorsLedger({
   // Filtered List
   const filteredCustomers = useMemo(() => {
     return customers.filter(c => {
-      const matchesSearch = c.name.toLowerCase().includes(search.toLowerCase()) || 
-                            (c.area && c.area.toLowerCase().includes(search.toLowerCase()));
-      const matchesDebt = filterMode === 'all' || (c.totalDebt || 0) > 0;
-      return matchesSearch && matchesDebt;
-    }).sort((a, b) => (b.totalDebt || 0) - (a.totalDebt || 0)); // Highest debt first
+      const term = search.toLowerCase();
+      const matchesSearch = c.name.toLowerCase().includes(term) || 
+                            (c.area && c.area.toLowerCase().includes(term)) ||
+                            (c.phone && c.phone.includes(term));
+      if (filterMode === 'withDebt') return matchesSearch && (c.totalDebt || 0) > 0;
+      if (filterMode === 'noDebt') return matchesSearch && (!c.totalDebt || c.totalDebt === 0);
+      return matchesSearch;
+    }).sort((a, b) => {
+      if ((b.totalDebt || 0) !== (a.totalDebt || 0)) {
+        return (b.totalDebt || 0) - (a.totalDebt || 0);
+      }
+      return a.name.localeCompare(b.name);
+    });
   }, [customers, search, filterMode]);
 
   // Customer sales history
@@ -290,14 +301,15 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
         </div>
       </div>
 
-      {/* Action Bar: Search, Filters, Add Button */}
+      {/* Action Bar: Search, Filters, View Mode Toggle, Add Button */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ display: 'flex', gap: '10px', flex: 1, minWidth: '280px' }}>
-          <div style={{ position: 'relative', flex: 1 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '10px', flex: 1, minWidth: '280px', alignItems: 'center' }}>
+          {/* Buscador */}
+          <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
             <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
             <input 
               type="text"
-              placeholder="Buscar compañero por nombre o área..."
+              placeholder="Buscar compañero por nombre, área o teléfono..."
               className="input"
               style={{ paddingLeft: '38px' }}
               value={search}
@@ -305,23 +317,10 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
             />
           </div>
 
+          {/* Filtros de estado */}
           <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 'var(--radius-md)', padding: '3px', border: '1px solid var(--border-subtle)' }}>
             <button
-              onClick={() => setFilterMode('withDebt')}
-              style={{
-                padding: '6px 12px',
-                borderRadius: 'var(--radius-sm)',
-                border: 'none',
-                background: filterMode === 'withDebt' ? 'var(--brand-blue)' : 'transparent',
-                color: filterMode === 'withDebt' ? '#fff' : 'var(--text-muted)',
-                fontWeight: 700,
-                fontSize: '0.8rem',
-                cursor: 'pointer'
-              }}
-            >
-              Con Deuda ({debtorsCount})
-            </button>
-            <button
+              type="button"
               onClick={() => setFilterMode('all')}
               style={{
                 padding: '6px 12px',
@@ -336,168 +335,443 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
             >
               Todos ({customers.length})
             </button>
+            <button
+              type="button"
+              onClick={() => setFilterMode('withDebt')}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 'var(--radius-sm)',
+                border: 'none',
+                background: filterMode === 'withDebt' ? '#ea580c' : 'transparent',
+                color: filterMode === 'withDebt' ? '#fff' : 'var(--text-muted)',
+                fontWeight: 700,
+                fontSize: '0.8rem',
+                cursor: 'pointer'
+              }}
+            >
+              Con Deuda ({debtorsCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterMode('noDebt')}
+              style={{
+                padding: '6px 12px',
+                borderRadius: 'var(--radius-sm)',
+                border: 'none',
+                background: filterMode === 'noDebt' ? '#16a34a' : 'transparent',
+                color: filterMode === 'noDebt' ? '#fff' : 'var(--text-muted)',
+                fontWeight: 700,
+                fontSize: '0.8rem',
+                cursor: 'pointer'
+              }}
+            >
+              Al Día ({Math.max(0, customers.length - debtorsCount)})
+            </button>
+          </div>
+
+          {/* Toggle Tabla / Tarjetas */}
+          <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 'var(--radius-md)', padding: '3px', border: '1px solid var(--border-subtle)' }}>
+            <button
+              type="button"
+              onClick={() => setViewMode('table')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '6px 11px',
+                borderRadius: 'var(--radius-sm)',
+                border: 'none',
+                background: viewMode === 'table' ? '#ffffff' : 'transparent',
+                color: viewMode === 'table' ? 'var(--brand-blue)' : 'var(--text-muted)',
+                boxShadow: viewMode === 'table' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                fontWeight: 700,
+                fontSize: '0.8rem',
+                cursor: 'pointer'
+              }}
+              title="Ver en formato tabla completa"
+            >
+              <TableIcon size={14} />
+              Tabla
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('cards')}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                padding: '6px 11px',
+                borderRadius: 'var(--radius-sm)',
+                border: 'none',
+                background: viewMode === 'cards' ? '#ffffff' : 'transparent',
+                color: viewMode === 'cards' ? 'var(--brand-blue)' : 'var(--text-muted)',
+                boxShadow: viewMode === 'cards' ? '0 1px 3px rgba(0,0,0,0.08)' : 'none',
+                fontWeight: 700,
+                fontSize: '0.8rem',
+                cursor: 'pointer'
+              }}
+              title="Ver en cuadrícula de tarjetas"
+            >
+              <LayoutGrid size={14} />
+              Tarjetas
+            </button>
           </div>
         </div>
 
+        {/* Botón Registrar */}
         <button 
+          type="button"
           className="btn btn-primary"
           onClick={handleOpenAddCustomer}
+          style={{ whiteSpace: 'nowrap' }}
         >
           <UserPlus size={18} />
           Registrar Compañero
         </button>
       </div>
 
-      {/* Debtors List / Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '14px' }}>
-        {filteredCustomers.map(c => {
-          const hasDebt = (c.totalDebt || 0) > 0;
-          return (
-            <div 
-              key={c.id} 
-              className="card"
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                justifyContent: 'space-between',
-                borderColor: hasDebt ? '#fed7aa' : 'var(--border-subtle)',
-                background: hasDebt ? '#fffaf5' : '#ffffff',
-                boxShadow: hasDebt ? '0 2px 8px rgba(234, 88, 12, 0.08)' : 'var(--shadow-sm)'
-              }}
-            >
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <div style={{
-                      width: '42px',
-                      height: '42px',
-                      borderRadius: '50%',
-                      background: hasDebt ? '#ffedd5' : '#e0f2fe',
-                      color: hasDebt ? '#ea580c' : '#0284c7',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontWeight: 800,
-                      fontSize: '1.05rem'
-                    }}>
-                      {c.name.charAt(0).toUpperCase()}
+      {/* VISTA 1: TABLA DE GESTIÓN DE COMPAÑEROS */}
+      {viewMode === 'table' ? (
+        <div className="card" style={{ padding: '0', overflow: 'hidden', background: '#ffffff', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-sm)' }}>
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left', minWidth: '700px' }}>
+              <thead>
+                <tr style={{ background: '#f8fafc', borderBottom: '1px solid var(--border-subtle)', color: 'var(--text-muted)', fontSize: '0.76rem', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                  <th style={{ padding: '14px 18px' }}>Compañero</th>
+                  <th style={{ padding: '14px 16px' }}>Área / Ubicación</th>
+                  <th style={{ padding: '14px 16px' }}>WhatsApp / Teléfono</th>
+                  <th style={{ padding: '14px 18px', textAlign: 'right' }}>Saldo Pendiente</th>
+                  <th style={{ padding: '14px 18px', textAlign: 'center' }}>Acciones para Gestionar</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCustomers.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" style={{ textAlign: 'center', padding: '48px 20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
+                      <Users size={36} style={{ margin: '0 auto 10px', opacity: 0.3 }} />
+                      <div style={{ fontWeight: 700, marginBottom: '4px' }}>No se encontraron compañeros</div>
+                      <div style={{ fontSize: '0.82rem', color: 'var(--text-dim)' }}>
+                        Puedes agregar uno nuevo con el botón superior "Registrar Compañero".
+                      </div>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredCustomers.map(c => {
+                    const hasDebt = (c.totalDebt || 0) > 0;
+                    return (
+                      <tr 
+                        key={c.id}
+                        style={{
+                          borderBottom: '1px solid var(--border-subtle)',
+                          background: hasDebt ? '#fffdfa' : '#ffffff',
+                          transition: 'background 0.15s ease'
+                        }}
+                      >
+                        {/* 1. Nombre & Avatar */}
+                        <td style={{ padding: '12px 18px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <div style={{
+                              width: '36px',
+                              height: '36px',
+                              borderRadius: '50%',
+                              background: hasDebt ? '#ffedd5' : '#e0f2fe',
+                              color: hasDebt ? '#ea580c' : '#0284c7',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              fontWeight: 800,
+                              fontSize: '0.95rem',
+                              flexShrink: 0
+                            }}>
+                              {c.name.charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 700, fontSize: '0.92rem', color: 'var(--text-main)' }}>
+                                {c.name}
+                              </div>
+                              <div style={{ marginTop: '2px' }}>
+                                {hasDebt ? (
+                                  <span style={{ background: '#ffedd5', color: '#c2410c', padding: '2px 7px', borderRadius: '999px', fontSize: '0.68rem', fontWeight: 800 }}>
+                                    Debe {formatCOP(c.totalDebt)}
+                                  </span>
+                                ) : (
+                                  <span style={{ background: '#dcfce7', color: '#15803d', padding: '2px 7px', borderRadius: '999px', fontSize: '0.68rem', fontWeight: 700 }}>
+                                    Al Día
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+
+                        {/* 2. Área */}
+                        <td style={{ padding: '12px 16px', fontSize: '0.86rem', color: 'var(--text-muted)' }}>
+                          {c.area || <span style={{ color: 'var(--text-dim)', fontStyle: 'italic' }}>Sin área asignada</span>}
+                        </td>
+
+                        {/* 3. Teléfono */}
+                        <td style={{ padding: '12px 16px', fontSize: '0.86rem' }}>
+                          {c.phone ? (
+                            <a
+                              href={`https://wa.me/57${c.phone.replace(/\D/g, '')}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', color: '#16a34a', textDecoration: 'none', fontWeight: 600 }}
+                              title="Escribir por WhatsApp"
+                            >
+                              <Phone size={13} />
+                              {c.phone}
+                            </a>
+                          ) : (
+                            <span style={{ color: 'var(--text-dim)' }}>—</span>
+                          )}
+                        </td>
+
+                        {/* 4. Saldo Pendiente */}
+                        <td style={{ padding: '12px 18px', textAlign: 'right' }}>
+                          <span style={{ 
+                            fontSize: '1.05rem', 
+                            fontWeight: 800, 
+                            color: hasDebt ? '#ea580c' : '#16a34a' 
+                          }}>
+                            {formatCOP(c.totalDebt || 0)}
+                          </span>
+                        </td>
+
+                        {/* 5. Acciones */}
+                        <td style={{ padding: '12px 18px' }}>
+                          <div style={{ display: 'flex', gap: '6px', justifyContent: 'center', alignItems: 'center' }}>
+                            {/* FIAR DIRECTO */}
+                            <button
+                              type="button"
+                              className="btn btn-orange"
+                              style={{ padding: '6px 12px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+                              title={`Fiar productos a ${c.name} en la caja`}
+                              onClick={() => onFiarToCustomer && onFiarToCustomer(c)}
+                            >
+                              <ShoppingCart size={13} />
+                              Fiar
+                            </button>
+
+                            {/* ABONAR (si debe) */}
+                            {hasDebt && (
+                              <button
+                                type="button"
+                                className="btn"
+                                style={{ background: '#10b981', color: '#fff', padding: '6px 10px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
+                                title="Abonar o liquidar deuda"
+                                onClick={() => handleOpenPayment(c)}
+                              >
+                                <DollarSign size={13} />
+                                Abonar
+                              </button>
+                            )}
+
+                            {/* VER DETALLE */}
+                            <button
+                              type="button"
+                              className="btn btn-secondary"
+                              style={{ padding: '6px 9px', fontSize: '0.78rem' }}
+                              title="Ver historial de compras y pagos"
+                              onClick={() => setSelectedCustomer(c)}
+                            >
+                              <Receipt size={13} />
+                            </button>
+
+                            {/* EDITAR */}
+                            <button
+                              type="button"
+                              className="btn-ghost"
+                              style={{ padding: '6px 8px', border: '1px solid #cbd5e1', borderRadius: 'var(--radius-sm)' }}
+                              title="Editar datos del compañero"
+                              onClick={() => handleOpenEditCustomer(c)}
+                            >
+                              <Pencil size={13} />
+                            </button>
+
+                            {/* ELIMINAR */}
+                            <button
+                              type="button"
+                              className="btn-ghost"
+                              style={{
+                                padding: '6px 8px',
+                                border: '1px solid #fee2e2',
+                                background: '#fff5f5',
+                                color: '#ef4444',
+                                borderRadius: 'var(--radius-sm)'
+                              }}
+                              title="Eliminar compañero"
+                              onClick={() => setDeleteTarget(c)}
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : (
+        /* VISTA 2: CUADRÍCULA DE TARJETAS */
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '14px' }}>
+          {filteredCustomers.map(c => {
+            const hasDebt = (c.totalDebt || 0) > 0;
+            return (
+              <div 
+                key={c.id} 
+                className="card"
+                style={{
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  borderColor: hasDebt ? '#fed7aa' : 'var(--border-subtle)',
+                  background: hasDebt ? '#fffaf5' : '#ffffff',
+                  boxShadow: hasDebt ? '0 2px 8px rgba(234, 88, 12, 0.08)' : 'var(--shadow-sm)'
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <div style={{
+                        width: '42px',
+                        height: '42px',
+                        borderRadius: '50%',
+                        background: hasDebt ? '#ffedd5' : '#e0f2fe',
+                        color: hasDebt ? '#ea580c' : '#0284c7',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontWeight: 800,
+                        fontSize: '1.05rem'
+                      }}>
+                        {c.name.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>{c.name}</h3>
+                        <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                          {c.area || 'Sin área asignada'}
+                        </div>
+                      </div>
                     </div>
-                    <div>
-                      <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-main)' }}>{c.name}</h3>
-                      <div style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
-                        {c.area || 'Empresa'}
+
+                    <div style={{ textAlign: 'right' }}>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontWeight: 600 }}>Saldo Actual</div>
+                      <div style={{ 
+                        fontSize: '1.3rem', 
+                        fontWeight: 800, 
+                        color: hasDebt ? '#ea580c' : '#16a34a' 
+                      }}>
+                        {formatCOP(c.totalDebt || 0)}
                       </div>
                     </div>
                   </div>
 
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontWeight: 600 }}>Saldo Actual</div>
-                    <div style={{ 
-                      fontSize: '1.3rem', 
-                      fontWeight: 800, 
-                      color: hasDebt ? '#ea580c' : '#16a34a' 
-                    }}>
-                      {formatCOP(c.totalDebt || 0)}
+                  {c.phone && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
+                      <Phone size={12} color="#16a34a" />
+                      <span>WhatsApp: {c.phone}</span>
                     </div>
-                  </div>
+                  )}
                 </div>
 
-                {c.phone && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '14px' }}>
-                    <Phone size={12} color="#16a34a" />
-                    <span>WhatsApp: {c.phone}</span>
-                  </div>
-                )}
+                {/* Botones de acción en la tarjeta */}
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: '12px', marginTop: '6px', flexWrap: 'wrap' }}>
+                  {/* Fiar */}
+                  <button
+                    type="button"
+                    className="btn btn-orange"
+                    style={{ padding: '8px 10px', fontSize: '0.8rem' }}
+                    title={`Fiar productos a ${c.name}`}
+                    onClick={() => onFiarToCustomer && onFiarToCustomer(c)}
+                  >
+                    <ShoppingCart size={13} />
+                    Fiar
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn btn-secondary"
+                    style={{ flex: 1, padding: '8px 10px', fontSize: '0.8rem' }}
+                    onClick={() => setSelectedCustomer(c)}
+                  >
+                    <Receipt size={14} />
+                    Detalle
+                  </button>
+
+                  {hasDebt && (
+                    <>
+                      <button
+                        type="button"
+                        className="btn"
+                        style={{ 
+                          background: '#25D366', 
+                          color: '#ffffff', 
+                          padding: '8px 10px', 
+                          fontSize: '0.8rem',
+                          boxShadow: '0 2px 8px rgba(37, 211, 102, 0.3)'
+                        }}
+                        title="Cobrar por WhatsApp con resumen"
+                        onClick={() => handleOpenWhatsApp(c)}
+                      >
+                        <MessageSquare size={14} />
+                      </button>
+
+                      <button
+                        type="button"
+                        className="btn btn-orange"
+                        style={{ padding: '8px 10px', fontSize: '0.8rem' }}
+                        onClick={() => handleOpenPayment(c)}
+                      >
+                        <DollarSign size={14} />
+                        Abonar
+                      </button>
+                    </>
+                  )}
+
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    style={{
+                      padding: '8px 9px',
+                      color: 'var(--text-muted)',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid #cbd5e1'
+                    }}
+                    title="Editar datos del compañero"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenEditCustomer(c);
+                    }}
+                  >
+                    <Pencil size={14} />
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn-ghost"
+                    style={{
+                      padding: '8px 9px',
+                      color: '#ef4444',
+                      borderRadius: 'var(--radius-sm)',
+                      border: '1px solid #fee2e2',
+                      background: '#fff5f5'
+                    }}
+                    title="Eliminar compañero"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setDeleteTarget(c);
+                    }}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
               </div>
-
-              {/* Action Buttons for this debtor */}
-              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: '12px', marginTop: '6px' }}>
-                <button
-                  className="btn btn-secondary"
-                  style={{ flex: 1, padding: '8px 10px', fontSize: '0.8rem' }}
-                  onClick={() => setSelectedCustomer(c)}
-                >
-                  <Receipt size={14} />
-                  Ver Detalle
-                </button>
-
-                {hasDebt && (
-                  <>
-                    <button
-                      className="btn"
-                      style={{ 
-                        background: '#25D366', 
-                        color: '#ffffff', 
-                        padding: '8px 10px', 
-                        fontSize: '0.8rem',
-                        boxShadow: '0 2px 8px rgba(37, 211, 102, 0.3)'
-                      }}
-                      title="Cobrar por WhatsApp con resumen"
-                      onClick={() => handleOpenWhatsApp(c)}
-                    >
-                      <MessageSquare size={14} />
-                      WhatsApp
-                    </button>
-
-                    <button
-                      className="btn btn-orange"
-                      style={{ padding: '8px 10px', fontSize: '0.8rem' }}
-                      onClick={() => handleOpenPayment(c)}
-                    >
-                      <DollarSign size={14} />
-                      Abonar
-                    </button>
-                  </>
-                )}
-
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  style={{
-                    padding: '8px 9px',
-                    color: 'var(--text-muted)',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid #cbd5e1'
-                  }}
-                  title="Editar datos del compañero"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenEditCustomer(c);
-                  }}
-                >
-                  <Pencil size={14} />
-                </button>
-
-                <button
-                  type="button"
-                  className="btn-ghost"
-                  style={{
-                    padding: '8px 9px',
-                    color: '#ef4444',
-                    borderRadius: 'var(--radius-sm)',
-                    border: '1px solid #fee2e2',
-                    background: '#fff5f5'
-                  }}
-                  title="Eliminar compañero"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setDeleteTarget(c);
-                  }}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {filteredCustomers.length === 0 && (
-        <div style={{ textAlign: 'center', padding: '60px 20px', color: 'var(--text-muted)' }}>
-          <p style={{ fontSize: '1.1rem', marginBottom: '8px' }}>
-            {filterMode === 'withDebt' ? '¡Nadie tiene deudas pendientes en este momento! 🎉' : 'No se encontraron compañeros.'}
-          </p>
-          <p style={{ fontSize: '0.85rem' }}>Puedes registrar nuevos compañeros con el botón superior.</p>
+            );
+          })}
         </div>
       )}
 

@@ -14,7 +14,15 @@ export default function App() {
   const store = useStore();
   const [activeTab, setActiveTab] = useState('pos');
   const [cart, setCart] = useState([]);
+  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [saleType, setSaleType] = useState('contado');
   const [pinModalState, setPinModalState] = useState({ isOpen: false, targetAdmin: null });
+
+  const handleFiarToCustomer = (customer) => {
+    setSelectedCustomerId(customer.id);
+    setSaleType('fiado');
+    setActiveTab('pos');
+  };
 
   // ── Pantalla de carga inicial ──────────────────────────────
   if (store.loading) {
@@ -128,6 +136,10 @@ export default function App() {
             activeAdmin={store.activeAdmin}
             cart={cart}
             setCart={setCart}
+            selectedCustomerId={selectedCustomerId}
+            setSelectedCustomerId={setSelectedCustomerId}
+            saleType={saleType}
+            setSaleType={setSaleType}
           />
         )}
 
@@ -141,6 +153,7 @@ export default function App() {
             onAddCustomer={store.addCustomer}
             onUpdateCustomer={store.updateCustomer}
             onDeleteCustomer={store.deleteCustomer}
+            onFiarToCustomer={handleFiarToCustomer}
             activeAdmin={store.activeAdmin}
           />
         )}

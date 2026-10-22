@@ -15,13 +15,22 @@ export default function POS({
   onAddCustomer,
   activeAdmin,
   cart,
-  setCart
+  setCart,
+  saleType: propSaleType,
+  setSaleType: propSetSaleType,
+  selectedCustomerId: propSelectedCustomerId,
+  setSelectedCustomerId: propSetSelectedCustomerId
 }) {
   const [search, setSearch] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Todos');
-  const [saleType, setSaleType] = useState('contado'); // 'contado' | 'fiado'
+  const [localSaleType, setLocalSaleType] = useState('contado');
+  const saleType = propSaleType !== undefined ? propSaleType : localSaleType;
+  const setSaleType = propSetSaleType || setLocalSaleType;
+
   const [paymentMethod, setPaymentMethod] = useState('efectivo'); // 'efectivo' | 'nequi' | 'daviplata'
-  const [selectedCustomerId, setSelectedCustomerId] = useState('');
+  const [localSelectedCustomerId, setLocalSelectedCustomerId] = useState('');
+  const selectedCustomerId = propSelectedCustomerId !== undefined ? propSelectedCustomerId : localSelectedCustomerId;
+  const setSelectedCustomerId = propSetSelectedCustomerId || setLocalSelectedCustomerId;
   const [isNewCustomerModalOpen, setIsNewCustomerModalOpen] = useState(false);
   const [newCustomerName, setNewCustomerName] = useState('');
   const [newCustomerArea, setNewCustomerArea] = useState('');
