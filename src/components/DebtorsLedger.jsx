@@ -2,10 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { 
   Users, Search, UserPlus, DollarSign, MessageSquare, 
   Receipt, ArrowRight, CheckCircle2, AlertCircle, Phone, 
-  Sparkles, History, Calendar, Trash2
+  Sparkles, History, Calendar, Trash2, Pencil
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { formatCOP } from '../data/store';
+import ConfirmModal from './ConfirmModal';
 
 export default function DebtorsLedger({ 
   customers, 
@@ -15,6 +16,7 @@ export default function DebtorsLedger({
   onRecordPayment, 
   onAddCustomer,
   onUpdateCustomer,
+  onDeleteCustomer,
   activeAdmin
 }) {
   const [search, setSearch] = useState('');
@@ -26,12 +28,17 @@ export default function DebtorsLedger({
   const [paymentNotes, setPaymentNotes] = useState('');
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
 
-  // New Customer Form State
+  // New / Edit Customer Form State
+  const [editingCustomer, setEditingCustomer] = useState(null);
   const [newName, setNewName] = useState('');
   const [newArea, setNewArea] = useState('');
   const [newPhone, setNewPhone] = useState('');
   const [savingCustomer, setSavingCustomer] = useState(false);
   const [saveCustomerError, setSaveCustomerError] = useState('');
+
+  // Delete Customer State
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Total KPIs
   const totalPendingDebt = useMemo(() => {
@@ -164,18 +171,53 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
     } : null);
   };
 
-  const handleCreateCustomer = async (e) => {
+  const handleOpenAddCustomer = () => {
+    setEditingCustomer(null);
+    setNewName('');
+    setNewArea('');
+    setNewPhone('');
+    setSaveCustomerError('');
+    setIsAddCustomerModalOpen(true);
+  };
+
+  const handleOpenEditCustomer = (c) => {
+    setEditingCustomer(c);
+    setNewName(c.name);
+    setNewArea(c.area || '');
+    setNewPhone(c.phone || '');
+    setSaveCustomerError('');
+    setIsAddCustomerModalOpen(true);
+  };
+
+  const handleSubmitCustomer = async (e) => {
     e.preventDefault();
-    if (!newName.trim()) return;
+    if (!newName.trim() || savingCustomer) return;
     setSavingCustomer(true);
     setSaveCustomerError('');
     try {
-      await onAddCustomer({
-        name: newName,
-        area: newArea,
-        phone: newPhone
-      });
+      if (editingCustomer) {
+        await onUpdateCustomer(editingCustomer.id, {
+          name: newName.trim(),
+          area: newArea.trim(),
+          phone: newPhone.trim()
+        });
+        if (selectedCustomer?.id === editingCustomer.id) {
+          setSelectedCustomer(prev => ({
+            ...prev,
+            name: newName.trim(),
+            area: newArea.trim(),
+            phone: newPhone.trim()
+          }));
+        }
+      } else {
+        await onAddCustomer({
+          name: newName.trim(),
+          area: newArea.trim(),
+          phone: newPhone.trim()
+        });
+      }
       setIsAddCustomerModalOpen(false);
+      setEditingCustomer(null);
       setNewName('');
       setNewArea('');
       setNewPhone('');
@@ -184,6 +226,23 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
       setSaveCustomerError('No se pudo guardar. Verifica la conexión e intenta de nuevo.');
     } finally {
       setSavingCustomer(false);
+    }
+  };
+
+  const handleConfirmDeleteCustomer = async () => {
+    if (!deleteTarget || isDeleting) return;
+    setIsDeleting(true);
+    try {
+      await onDeleteCustomer(deleteTarget.id);
+      if (selectedCustomer?.id === deleteTarget.id) {
+        setSelectedCustomer(null);
+      }
+      setDeleteTarget(null);
+    } catch (err) {
+      console.error('[DebtorsLedger] Error eliminando compañero:', err);
+      alert('Error al eliminar compañero: ' + (err.message || 'Verifica la conexión.'));
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -282,7 +341,7 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
 
         <button 
           className="btn btn-primary"
-          onClick={() => setIsAddCustomerModalOpen(true)}
+          onClick={handleOpenAddCustomer}
         >
           <UserPlus size={18} />
           Registrar Compañero
@@ -352,7 +411,7 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
               </div>
 
               {/* Action Buttons for this debtor */}
-              <div style={{ display: 'flex', gap: '8px', borderTop: '1px solid var(--border-subtle)', paddingTop: '12px', marginTop: '6px' }}>
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'center', borderTop: '1px solid var(--border-subtle)', paddingTop: '12px', marginTop: '6px' }}>
                 <button
                   className="btn btn-secondary"
                   style={{ flex: 1, padding: '8px 10px', fontSize: '0.8rem' }}
@@ -382,7 +441,7 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
 
                     <button
                       className="btn btn-orange"
-                      style={{ padding: '8px 12px', fontSize: '0.8rem' }}
+                      style={{ padding: '8px 10px', fontSize: '0.8rem' }}
                       onClick={() => handleOpenPayment(c)}
                     >
                       <DollarSign size={14} />
@@ -390,6 +449,43 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
                     </button>
                   </>
                 )}
+
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  style={{
+                    padding: '8px 9px',
+                    color: 'var(--text-muted)',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid #cbd5e1'
+                  }}
+                  title="Editar datos del compañero"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenEditCustomer(c);
+                  }}
+                >
+                  <Pencil size={14} />
+                </button>
+
+                <button
+                  type="button"
+                  className="btn-ghost"
+                  style={{
+                    padding: '8px 9px',
+                    color: '#ef4444',
+                    borderRadius: 'var(--radius-sm)',
+                    border: '1px solid #fee2e2',
+                    background: '#fff5f5'
+                  }}
+                  title="Eliminar compañero"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteTarget(c);
+                  }}
+                >
+                  <Trash2 size={14} />
+                </button>
               </div>
             </div>
           );
@@ -526,7 +622,33 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
               )}
             </div>
 
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '16px' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', borderTop: '1px solid var(--border-subtle)', paddingTop: '14px' }}>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  style={{ fontSize: '0.82rem', padding: '6px 12px' }}
+                  onClick={() => handleOpenEditCustomer(selectedCustomer)}
+                >
+                  <Pencil size={13} />
+                  Editar Datos
+                </button>
+                <button
+                  type="button"
+                  className="btn"
+                  style={{
+                    background: '#fef2f2',
+                    color: '#dc2626',
+                    border: '1px solid #fecaca',
+                    fontSize: '0.82rem',
+                    padding: '6px 12px'
+                  }}
+                  onClick={() => setDeleteTarget(selectedCustomer)}
+                >
+                  <Trash2 size={13} />
+                  Eliminar
+                </button>
+              </div>
               <button className="btn btn-secondary" onClick={() => setSelectedCustomer(null)}>
                 Cerrar
               </button>
@@ -635,15 +757,15 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
         </div>
       )}
 
-      {/* CREATE NEW CUSTOMER MODAL */}
+      {/* CREATE / EDIT CUSTOMER MODAL */}
       {isAddCustomerModalOpen && (
-        <div className="modal-overlay" onClick={() => setIsAddCustomerModalOpen(false)}>
+        <div className="modal-overlay" onClick={() => { setIsAddCustomerModalOpen(false); setEditingCustomer(null); setSaveCustomerError(''); }}>
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <h2 style={{ fontSize: '1.25rem', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <UserPlus color="#38bdf8" />
-              Registrar Nuevo Compañero
+              {editingCustomer ? <Pencil color="#38bdf8" /> : <UserPlus color="#38bdf8" />}
+              {editingCustomer ? 'Editar Compañero' : 'Registrar Nuevo Compañero'}
             </h2>
-            <form onSubmit={handleCreateCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <form onSubmit={handleSubmitCustomer} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
               <div>
                 <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
                   Nombre completo: *
@@ -689,12 +811,14 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
                 <button 
                   type="button" 
                   className="btn btn-secondary"
-                  onClick={() => { setIsAddCustomerModalOpen(false); setSaveCustomerError(''); }}
+                  onClick={() => { setIsAddCustomerModalOpen(false); setEditingCustomer(null); setSaveCustomerError(''); }}
                 >
                   Cancelar
                 </button>
                 <button type="submit" className="btn btn-primary" disabled={savingCustomer}>
-                  {savingCustomer ? 'Guardando...' : 'Guardar Compañero'}
+                  {savingCustomer 
+                    ? 'Guardando...' 
+                    : (editingCustomer ? 'Guardar Cambios' : 'Guardar Compañero')}
                 </button>
               </div>
 
@@ -707,6 +831,34 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
           </div>
         </div>
       )}
+
+      {/* MODAL CONFIRM DELETE CUSTOMER */}
+      <ConfirmModal
+        isOpen={Boolean(deleteTarget)}
+        title={deleteTarget && (deleteTarget.totalDebt || 0) > 0 ? '¿Eliminar compañero con deuda?' : '¿Eliminar compañero?'}
+        message={
+          deleteTarget ? (
+            (deleteTarget.totalDebt || 0) > 0 ? (
+              <span>
+                <strong>{deleteTarget.name}</strong> tiene un saldo pendiente de{' '}
+                <strong style={{ color: '#ea580c' }}>{formatCOP(deleteTarget.totalDebt)}</strong>.
+                <br /><br />
+                Si lo eliminas, su historial quedará archivado pero ya no aparecerá en el listado de cobro. ¿Deseas eliminarlo de todos modos?
+              </span>
+            ) : (
+              <span>
+                ¿Estás seguro de que deseas eliminar a <strong>{deleteTarget.name}</strong>?
+                Esta acción no se puede deshacer.
+              </span>
+            )
+          ) : ''
+        }
+        confirmLabel={isDeleting ? 'Eliminando...' : 'Eliminar Compañero'}
+        cancelLabel="Cancelar"
+        danger={true}
+        onConfirm={handleConfirmDeleteCustomer}
+        onCancel={() => { if (!isDeleting) setDeleteTarget(null); }}
+      />
     </div>
   );
 }

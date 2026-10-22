@@ -140,6 +140,7 @@ export default function App() {
             onRecordPayment={store.recordPayment}
             onAddCustomer={store.addCustomer}
             onUpdateCustomer={store.updateCustomer}
+            onDeleteCustomer={store.deleteCustomer}
             activeAdmin={store.activeAdmin}
           />
         )}
