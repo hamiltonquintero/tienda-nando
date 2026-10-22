@@ -30,6 +30,8 @@ export default function DebtorsLedger({
   const [newName, setNewName] = useState('');
   const [newArea, setNewArea] = useState('');
   const [newPhone, setNewPhone] = useState('');
+  const [savingCustomer, setSavingCustomer] = useState(false);
+  const [saveCustomerError, setSaveCustomerError] = useState('');
 
   // Total KPIs
   const totalPendingDebt = useMemo(() => {
@@ -162,18 +164,27 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
     } : null);
   };
 
-  const handleCreateCustomer = (e) => {
+  const handleCreateCustomer = async (e) => {
     e.preventDefault();
     if (!newName.trim()) return;
-    onAddCustomer({
-      name: newName,
-      area: newArea,
-      phone: newPhone
-    });
-    setIsAddCustomerModalOpen(false);
-    setNewName('');
-    setNewArea('');
-    setNewPhone('');
+    setSavingCustomer(true);
+    setSaveCustomerError('');
+    try {
+      await onAddCustomer({
+        name: newName,
+        area: newArea,
+        phone: newPhone
+      });
+      setIsAddCustomerModalOpen(false);
+      setNewName('');
+      setNewArea('');
+      setNewPhone('');
+    } catch (err) {
+      console.error('[DebtorsLedger] Error guardando compañero:', err);
+      setSaveCustomerError('No se pudo guardar. Verifica la conexión e intenta de nuevo.');
+    } finally {
+      setSavingCustomer(false);
+    }
   };
 
   return (
@@ -678,14 +689,20 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
                 <button 
                   type="button" 
                   className="btn btn-secondary"
-                  onClick={() => setIsAddCustomerModalOpen(false)}
+                  onClick={() => { setIsAddCustomerModalOpen(false); setSaveCustomerError(''); }}
                 >
                   Cancelar
                 </button>
-                <button type="submit" className="btn btn-primary">
-                  Guardar Compañero
+                <button type="submit" className="btn btn-primary" disabled={savingCustomer}>
+                  {savingCustomer ? 'Guardando...' : 'Guardar Compañero'}
                 </button>
               </div>
+
+              {saveCustomerError && (
+                <div style={{ color: '#ef4444', fontSize: '0.82rem', fontWeight: 600, marginTop: '8px', textAlign: 'center' }}>
+                  ⚠️ {saveCustomerError}
+                </div>
+              )}
             </form>
           </div>
         </div>

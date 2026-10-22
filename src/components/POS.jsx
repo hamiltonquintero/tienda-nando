@@ -137,19 +137,23 @@ export default function POS({
   };
 
   // Quick Add Customer
-  const handleQuickAddCustomer = (e) => {
+  const handleQuickAddCustomer = async (e) => {
     e.preventDefault();
     if (!newCustomerName.trim()) return;
-    const added = onAddCustomer({
-      name: newCustomerName,
-      area: newCustomerArea,
-      phone: newCustomerPhone
-    });
-    setSelectedCustomerId(added.id);
-    setIsNewCustomerModalOpen(false);
-    setNewCustomerName('');
-    setNewCustomerArea('');
-    setNewCustomerPhone('');
+    try {
+      const added = await onAddCustomer({
+        name: newCustomerName,
+        area: newCustomerArea,
+        phone: newCustomerPhone
+      });
+      if (added) setSelectedCustomerId(added.id);
+      setIsNewCustomerModalOpen(false);
+      setNewCustomerName('');
+      setNewCustomerArea('');
+      setNewCustomerPhone('');
+    } catch (err) {
+      console.error('[POS] Error guardando compañero:', err);
+    }
   };
 
   return (

@@ -338,7 +338,10 @@ export function useStore() {
       total_debt: 0
     };
     const { error } = await supabase.from('customers').insert(newCust);
-    if (error) console.error('[store] Error agregando cliente:', error);
+    if (error) {
+      console.error('[store] Error agregando cliente:', error);
+      throw new Error(error.message);
+    }
     return mapCustomer(newCust);
   };
 
