@@ -831,10 +831,53 @@ export default function POS({
                 </option>
                 {customers.map(c => (
                   <option key={c.id} value={c.id}>
-                    {c.name} {c.area ? `(${c.area})` : ''} {c.totalDebt > 0 ? `· Saldo: ${formatCOP(c.totalDebt)}` : ''}
+                    {c.name} {c.area ? `(${c.area})` : ''} {c.totalDebt > 0 ? `· Debe: ${formatCOP(c.totalDebt)}` : c.totalDebt < 0 ? `· ✨ A favor: +${formatCOP(Math.abs(c.totalDebt))}` : '· Al día'}
                   </option>
                 ))}
               </select>
+
+              {/* Informative banner for selected customer */}
+              {(() => {
+                const selCust = customers.find(c => c.id === selectedCustomerId);
+                if (!selCust) return null;
+                const debt = Number(selCust.totalDebt || 0);
+                if (debt > 0) {
+                  return (
+                    <div style={{ marginTop: '6px', padding: '6px 10px', borderRadius: '6px', fontSize: '0.76rem', background: '#fff7ed', border: '1px solid #fed7aa', color: '#c2410c', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span>⚠️ Deuda pendiente: <strong>{formatCOP(debt)}</strong></span>
+                      {saleType === 'fiado' && cartTotal > 0 && (
+                        <span style={{ fontSize: '0.72rem', color: '#9a3412' }}>
+                          → Pasará a {formatCOP(debt + cartTotal)}
+                        </span>
+                      )}
+                    </div>
+                  );
+                }
+                if (debt < 0) {
+                  const credit = Math.abs(debt);
+                  const coversAll = credit >= cartTotal;
+                  return (
+                    <div style={{ marginTop: '6px', padding: '6px 10px', borderRadius: '6px', fontSize: '0.76rem', background: '#ecfdf5', border: '1px solid #a7f3d0', color: '#047857' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '5px', fontWeight: 700 }}>
+                        <Sparkles size={13} color="#059669" />
+                        <span>Tiene saldo a favor de +{formatCOP(credit)}</span>
+                      </div>
+                      {saleType === 'fiado' && cartTotal > 0 && (
+                        <div style={{ fontSize: '0.72rem', marginTop: '2px', color: '#065f46' }}>
+                          {coversAll 
+                            ? `✅ Esta compra de ${formatCOP(cartTotal)} se descontará de su saldo. Le quedarán +${formatCOP(credit - cartTotal)} a favor.`
+                            : `⚠️ Esta compra de ${formatCOP(cartTotal)} consumirá su saldo a favor (+${formatCOP(credit)}) y quedará debiendo ${formatCOP(cartTotal - credit)}.`}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+                return (
+                  <div style={{ marginTop: '6px', padding: '4px 8px', borderRadius: '6px', fontSize: '0.74rem', background: '#f8fafc', border: '1px solid #e2e8f0', color: '#475569' }}>
+                    ✅ Compañero al día ($0 deuda)
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Total and Checkout button */}

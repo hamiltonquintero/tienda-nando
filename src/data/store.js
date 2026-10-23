@@ -493,7 +493,7 @@ export function useStore() {
     if (targetSale.type === 'fiado' && targetSale.customerId) {
       const cust = customers.find(c => c.id === targetSale.customerId);
       if (cust) {
-        const newDebt = Math.max(0, Number(cust.totalDebt || 0) - Number(targetSale.total));
+        const newDebt = Number(cust.totalDebt || 0) - Number(targetSale.total);
         await supabase.from('customers').update({ total_debt: newDebt }).eq('id', targetSale.customerId);
         setCustomers(prev => prev.map(c => c.id === targetSale.customerId ? { ...c, totalDebt: newDebt } : c));
       }
@@ -534,8 +534,8 @@ export function useStore() {
       throw new Error(payErr.message);
     }
 
-    // Reducir deuda del cliente
-    const newDebt = Math.max(0, Number(targetCust.totalDebt) - Number(amount));
+    // Actualizar deuda del cliente (permite saldo a favor si amount > totalDebt)
+    const newDebt = Number(targetCust.totalDebt || 0) - Number(amount);
     await supabase.from('customers').update({ total_debt: newDebt }).eq('id', customerId);
 
     setCustomers(prev => prev.map(c => c.id === customerId ? { ...c, totalDebt: newDebt } : c));

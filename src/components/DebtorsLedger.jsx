@@ -66,7 +66,7 @@ export default function DebtorsLedger({
       if (selectedCustomer && selectedCustomer.id === cancellingSale.customerId) {
         setSelectedCustomer(prev => prev ? {
           ...prev,
-          totalDebt: Math.max(0, (prev.totalDebt || 0) - Number(cancellingSale.total))
+          totalDebt: (prev.totalDebt || 0) - Number(cancellingSale.total)
         } : null);
       }
       setCancellingSale(null);
@@ -81,11 +81,27 @@ export default function DebtorsLedger({
 
   // Total KPIs
   const totalPendingDebt = useMemo(() => {
-    return customers.reduce((sum, c) => sum + (c.totalDebt || 0), 0);
+    return customers
+      .filter(c => (c.totalDebt || 0) > 0)
+      .reduce((sum, c) => sum + c.totalDebt, 0);
+  }, [customers]);
+
+  const totalCreditBalance = useMemo(() => {
+    return customers
+      .filter(c => (c.totalDebt || 0) < 0)
+      .reduce((sum, c) => sum + Math.abs(c.totalDebt), 0);
   }, [customers]);
 
   const debtorsCount = useMemo(() => {
     return customers.filter(c => (c.totalDebt || 0) > 0).length;
+  }, [customers]);
+
+  const creditCount = useMemo(() => {
+    return customers.filter(c => (c.totalDebt || 0) < 0).length;
+  }, [customers]);
+
+  const settledCount = useMemo(() => {
+    return customers.filter(c => !c.totalDebt || c.totalDebt === 0).length;
   }, [customers]);
 
   const totalCollectedRecent = useMemo(() => {
@@ -103,6 +119,7 @@ export default function DebtorsLedger({
                             (c.phone && c.phone.includes(term));
       if (filterMode === 'withDebt') return matchesSearch && (c.totalDebt || 0) > 0;
       if (filterMode === 'noDebt') return matchesSearch && (!c.totalDebt || c.totalDebt === 0);
+      if (filterMode === 'withCredit') return matchesSearch && (c.totalDebt || 0) < 0;
       return matchesSearch;
     }).sort((a, b) => {
       if ((b.totalDebt || 0) !== (a.totalDebt || 0)) {
@@ -181,7 +198,7 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
 
   const handleOpenPayment = (customer) => {
     setSelectedCustomer(customer);
-    setPaymentAmount(customer.totalDebt ? customer.totalDebt.toString() : '');
+    setPaymentAmount(customer.totalDebt && customer.totalDebt > 0 ? customer.totalDebt.toString() : '');
     setIsPaymentModalOpen(true);
   };
 
@@ -197,7 +214,7 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
       notes: paymentNotes
     });
 
-    if (amount >= selectedCustomer.totalDebt) {
+    if (amount >= (selectedCustomer.totalDebt || 0)) {
       try {
         confetti({
           particleCount: 80,
@@ -214,7 +231,7 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
     // Update local selected customer reference
     setSelectedCustomer(prev => prev ? {
       ...prev,
-      totalDebt: Math.max(0, (prev.totalDebt || 0) - amount)
+      totalDebt: (prev.totalDebt || 0) - amount
     } : null);
   };
 
@@ -296,7 +313,7 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
       {/* Top Stat Cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '14px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '14px' }}>
         <div className="card" style={{ borderLeft: '4px solid var(--brand-orange)', background: '#ffffff' }}>
           <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
             <DollarSign size={16} color="var(--brand-orange)" />
@@ -307,6 +324,19 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
           </div>
           <div style={{ fontSize: '0.74rem', color: 'var(--text-dim)', marginTop: '4px' }}>
             Acumulado de fiados en la quincena
+          </div>
+        </div>
+
+        <div className="card" style={{ borderLeft: '4px solid #10b981', background: '#ffffff' }}>
+          <div style={{ fontSize: '0.82rem', color: 'var(--text-muted)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Sparkles size={16} color="#10b981" />
+            Saldo a Favor Clientes
+          </div>
+          <div style={{ fontSize: '1.8rem', fontWeight: 800, color: '#10b981', marginTop: '6px' }}>
+            +{formatCOP(totalCreditBalance)}
+          </div>
+          <div style={{ fontSize: '0.74rem', color: 'var(--text-dim)', marginTop: '4px' }}>
+            {creditCount} {creditCount === 1 ? 'persona con saldo a favor' : 'personas con saldo a favor'}
           </div>
         </div>
 
@@ -344,22 +374,22 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
           <div style={{ position: 'relative', flex: 1, minWidth: '220px' }}>
             <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-dim)' }} />
             <input 
-              type="text"
-              placeholder="Buscar compañero por nombre, área o teléfono..."
-              className="input"
-              style={{ paddingLeft: '38px' }}
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              type="text" 
+              placeholder="Buscar compañero por nombre, área o teléfono..." 
+              className="input" 
+              style={{ paddingLeft: '38px' }} 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
             />
           </div>
 
           {/* Filtros de estado */}
-          <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 'var(--radius-md)', padding: '3px', border: '1px solid var(--border-subtle)' }}>
+          <div style={{ display: 'flex', background: '#f1f5f9', borderRadius: 'var(--radius-md)', padding: '3px', border: '1px solid var(--border-subtle)', flexWrap: 'wrap', gap: '2px' }}>
             <button
               type="button"
               onClick={() => setFilterMode('all')}
               style={{
-                padding: '6px 12px',
+                padding: '6px 11px',
                 borderRadius: 'var(--radius-sm)',
                 border: 'none',
                 background: filterMode === 'all' ? 'var(--brand-blue)' : 'transparent',
@@ -375,7 +405,7 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
               type="button"
               onClick={() => setFilterMode('withDebt')}
               style={{
-                padding: '6px 12px',
+                padding: '6px 11px',
                 borderRadius: 'var(--radius-sm)',
                 border: 'none',
                 background: filterMode === 'withDebt' ? '#ea580c' : 'transparent',
@@ -389,19 +419,35 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
             </button>
             <button
               type="button"
-              onClick={() => setFilterMode('noDebt')}
+              onClick={() => setFilterMode('withCredit')}
               style={{
-                padding: '6px 12px',
+                padding: '6px 11px',
                 borderRadius: 'var(--radius-sm)',
                 border: 'none',
-                background: filterMode === 'noDebt' ? '#16a34a' : 'transparent',
+                background: filterMode === 'withCredit' ? '#10b981' : 'transparent',
+                color: filterMode === 'withCredit' ? '#fff' : 'var(--text-muted)',
+                fontWeight: 700,
+                fontSize: '0.8rem',
+                cursor: 'pointer'
+              }}
+            >
+              A Favor ({creditCount})
+            </button>
+            <button
+              type="button"
+              onClick={() => setFilterMode('noDebt')}
+              style={{
+                padding: '6px 11px',
+                borderRadius: 'var(--radius-sm)',
+                border: 'none',
+                background: filterMode === 'noDebt' ? '#64748b' : 'transparent',
                 color: filterMode === 'noDebt' ? '#fff' : 'var(--text-muted)',
                 fontWeight: 700,
                 fontSize: '0.8rem',
                 cursor: 'pointer'
               }}
             >
-              Al Día ({Math.max(0, customers.length - debtorsCount)})
+              Al Día ({settledCount})
             </button>
           </div>
 
@@ -494,12 +540,13 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
                 ) : (
                   filteredCustomers.map(c => {
                     const hasDebt = (c.totalDebt || 0) > 0;
+                    const hasCredit = (c.totalDebt || 0) < 0;
                     return (
                       <tr 
                         key={c.id}
                         style={{
                           borderBottom: '1px solid var(--border-subtle)',
-                          background: hasDebt ? '#fffdfa' : '#ffffff',
+                          background: hasDebt ? '#fffdfa' : hasCredit ? '#f0fdf4' : '#ffffff',
                           transition: 'background 0.15s ease'
                         }}
                       >
@@ -510,8 +557,8 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
                               width: '36px',
                               height: '36px',
                               borderRadius: '50%',
-                              background: hasDebt ? '#ffedd5' : '#e0f2fe',
-                              color: hasDebt ? '#ea580c' : '#0284c7',
+                              background: hasDebt ? '#ffedd5' : hasCredit ? '#dcfce7' : '#e0f2fe',
+                              color: hasDebt ? '#ea580c' : hasCredit ? '#15803d' : '#0284c7',
                               display: 'flex',
                               alignItems: 'center',
                               justifyContent: 'center',
@@ -530,9 +577,13 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
                                   <span style={{ background: '#ffedd5', color: '#c2410c', padding: '2px 7px', borderRadius: '999px', fontSize: '0.68rem', fontWeight: 800 }}>
                                     Debe {formatCOP(c.totalDebt)}
                                   </span>
+                                ) : hasCredit ? (
+                                  <span style={{ background: '#dcfce7', color: '#15803d', padding: '2px 7px', borderRadius: '999px', fontSize: '0.68rem', fontWeight: 800, display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                                    ✨ A favor: {formatCOP(Math.abs(c.totalDebt))}
+                                  </span>
                                 ) : (
-                                  <span style={{ background: '#dcfce7', color: '#15803d', padding: '2px 7px', borderRadius: '999px', fontSize: '0.68rem', fontWeight: 700 }}>
-                                    Al Día
+                                  <span style={{ background: '#f1f5f9', color: '#64748b', padding: '2px 7px', borderRadius: '999px', fontSize: '0.68rem', fontWeight: 700 }}>
+                                    Al Día ($0)
                                   </span>
                                 )}
                               </div>
@@ -568,9 +619,9 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
                           <span style={{ 
                             fontSize: '1.05rem', 
                             fontWeight: 800, 
-                            color: hasDebt ? '#ea580c' : '#16a34a' 
+                            color: hasDebt ? '#ea580c' : hasCredit ? '#10b981' : '#64748b' 
                           }}>
-                            {formatCOP(c.totalDebt || 0)}
+                            {hasCredit ? `+${formatCOP(Math.abs(c.totalDebt))}` : formatCOP(c.totalDebt || 0)}
                           </span>
                         </td>
 
@@ -589,19 +640,23 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
                               Fiar
                             </button>
 
-                            {/* ABONAR (si debe) */}
-                            {hasDebt && (
-                              <button
-                                type="button"
-                                className="btn"
-                                style={{ background: '#10b981', color: '#fff', padding: '6px 10px', fontSize: '0.78rem', whiteSpace: 'nowrap' }}
-                                title="Abonar o liquidar deuda"
-                                onClick={() => handleOpenPayment(c)}
-                              >
-                                <DollarSign size={13} />
-                                Abonar
-                              </button>
-                            )}
+                            {/* ABONAR O CARGAR SALDO */}
+                            <button
+                              type="button"
+                              className="btn"
+                              style={{ 
+                                background: hasDebt ? '#10b981' : '#059669', 
+                                color: '#fff', 
+                                padding: '6px 10px', 
+                                fontSize: '0.78rem', 
+                                whiteSpace: 'nowrap' 
+                              }}
+                              title={hasDebt ? "Abonar o liquidar deuda" : "Cargar saldo a favor"}
+                              onClick={() => handleOpenPayment(c)}
+                            >
+                              <DollarSign size={13} />
+                              {hasDebt ? 'Abonar' : '+ Cargar Saldo'}
+                            </button>
 
                             {/* VER DETALLE */}
                             <button
@@ -656,6 +711,7 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '14px' }}>
           {filteredCustomers.map(c => {
             const hasDebt = (c.totalDebt || 0) > 0;
+            const hasCredit = (c.totalDebt || 0) < 0;
             return (
               <div 
                 key={c.id} 
@@ -664,9 +720,9 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
                   display: 'flex',
                   flexDirection: 'column',
                   justifyContent: 'space-between',
-                  borderColor: hasDebt ? '#fed7aa' : 'var(--border-subtle)',
-                  background: hasDebt ? '#fffaf5' : '#ffffff',
-                  boxShadow: hasDebt ? '0 2px 8px rgba(234, 88, 12, 0.08)' : 'var(--shadow-sm)'
+                  borderColor: hasDebt ? '#fed7aa' : hasCredit ? '#a7f3d0' : 'var(--border-subtle)',
+                  background: hasDebt ? '#fffaf5' : hasCredit ? '#f0fdf4' : '#ffffff',
+                  boxShadow: hasDebt ? '0 2px 8px rgba(234, 88, 12, 0.08)' : hasCredit ? '0 2px 8px rgba(16, 185, 129, 0.08)' : 'var(--shadow-sm)'
                 }}
               >
                 <div>
@@ -676,8 +732,8 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
                         width: '42px',
                         height: '42px',
                         borderRadius: '50%',
-                        background: hasDebt ? '#ffedd5' : '#e0f2fe',
-                        color: hasDebt ? '#ea580c' : '#0284c7',
+                        background: hasDebt ? '#ffedd5' : hasCredit ? '#dcfce7' : '#e0f2fe',
+                        color: hasDebt ? '#ea580c' : hasCredit ? '#15803d' : '#0284c7',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
@@ -695,13 +751,15 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
                     </div>
 
                     <div style={{ textAlign: 'right' }}>
-                      <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontWeight: 600 }}>Saldo Actual</div>
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-dim)', fontWeight: 600 }}>
+                        {hasCredit ? 'Saldo a Favor' : 'Saldo Actual'}
+                      </div>
                       <div style={{ 
                         fontSize: '1.3rem', 
                         fontWeight: 800, 
-                        color: hasDebt ? '#ea580c' : '#16a34a' 
+                        color: hasDebt ? '#ea580c' : hasCredit ? '#10b981' : '#64748b' 
                       }}>
-                        {formatCOP(c.totalDebt || 0)}
+                        {hasCredit ? `+${formatCOP(Math.abs(c.totalDebt))}` : formatCOP(c.totalDebt || 0)}
                       </div>
                     </div>
                   </div>
@@ -739,34 +797,38 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
                   </button>
 
                   {hasDebt && (
-                    <>
-                      <button
-                        type="button"
-                        className="btn"
-                        style={{ 
-                          background: '#25D366', 
-                          color: '#ffffff', 
-                          padding: '8px 10px', 
-                          fontSize: '0.8rem',
-                          boxShadow: '0 2px 8px rgba(37, 211, 102, 0.3)'
-                        }}
-                        title="Cobrar por WhatsApp con resumen"
-                        onClick={() => handleOpenWhatsApp(c)}
-                      >
-                        <MessageSquare size={14} />
-                      </button>
-
-                      <button
-                        type="button"
-                        className="btn btn-orange"
-                        style={{ padding: '8px 10px', fontSize: '0.8rem' }}
-                        onClick={() => handleOpenPayment(c)}
-                      >
-                        <DollarSign size={14} />
-                        Abonar
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      className="btn"
+                      style={{ 
+                        background: '#25D366', 
+                        color: '#ffffff', 
+                        padding: '8px 10px', 
+                        fontSize: '0.8rem',
+                        boxShadow: '0 2px 8px rgba(37, 211, 102, 0.3)'
+                      }}
+                      title="Cobrar por WhatsApp con resumen"
+                      onClick={() => handleOpenWhatsApp(c)}
+                    >
+                      <MessageSquare size={14} />
+                    </button>
                   )}
+
+                  <button
+                    type="button"
+                    className="btn"
+                    style={{ 
+                      padding: '8px 10px', 
+                      fontSize: '0.8rem',
+                      background: hasDebt ? '#ea580c' : '#10b981',
+                      color: '#ffffff'
+                    }}
+                    onClick={() => handleOpenPayment(c)}
+                    title={hasDebt ? "Abonar o liquidar deuda" : "Cargar saldo a favor"}
+                  >
+                    <DollarSign size={14} />
+                    {hasDebt ? 'Abonar' : '+ Saldo'}
+                  </button>
 
                   <button
                     type="button"
@@ -824,35 +886,45 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
               </div>
 
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>Deuda Total</div>
-                <div style={{ fontSize: '1.6rem', fontWeight: 800, color: selectedCustomer.totalDebt > 0 ? '#fb923c' : '#10b981' }}>
-                  {formatCOP(selectedCustomer.totalDebt || 0)}
+                <div style={{ fontSize: '0.75rem', color: 'var(--text-dim)' }}>
+                  {(selectedCustomer.totalDebt || 0) < 0 ? 'Saldo a Favor' : 'Deuda Total'}
+                </div>
+                <div style={{ 
+                  fontSize: '1.6rem', 
+                  fontWeight: 800, 
+                  color: (selectedCustomer.totalDebt || 0) > 0 ? '#fb923c' : (selectedCustomer.totalDebt || 0) < 0 ? '#10b981' : '#64748b' 
+                }}>
+                  {(selectedCustomer.totalDebt || 0) < 0 
+                    ? `+${formatCOP(Math.abs(selectedCustomer.totalDebt))}` 
+                    : formatCOP(selectedCustomer.totalDebt || 0)}
                 </div>
               </div>
             </div>
 
             {/* Quick action strip in detail */}
             <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-              {selectedCustomer.totalDebt > 0 && (
-                <>
-                  <button 
-                    className="btn"
-                    style={{ flex: 1, background: '#25D366', color: '#fff' }}
-                    onClick={() => handleOpenWhatsApp(selectedCustomer)}
-                  >
-                    <MessageSquare size={16} />
-                    Enviar Cuenta por WhatsApp
-                  </button>
-                  <button 
-                    className="btn btn-orange"
-                    style={{ flex: 1 }}
-                    onClick={() => handleOpenPayment(selectedCustomer)}
-                  >
-                    <DollarSign size={16} />
-                    Liquidar o Abonar
-                  </button>
-                </>
+              {(selectedCustomer.totalDebt || 0) > 0 && (
+                <button 
+                  className="btn"
+                  style={{ flex: 1, background: '#25D366', color: '#fff' }}
+                  onClick={() => handleOpenWhatsApp(selectedCustomer)}
+                >
+                  <MessageSquare size={16} />
+                  Enviar Cuenta por WhatsApp
+                </button>
               )}
+              <button 
+                className="btn"
+                style={{ 
+                  flex: 1, 
+                  background: (selectedCustomer.totalDebt || 0) > 0 ? '#ea580c' : '#10b981', 
+                  color: '#ffffff' 
+                }}
+                onClick={() => handleOpenPayment(selectedCustomer)}
+              >
+                <DollarSign size={16} />
+                {(selectedCustomer.totalDebt || 0) > 0 ? 'Liquidar o Abonar' : '+ Cargar Saldo a Favor'}
+              </button>
             </div>
 
             {/* History tabs: Purchases vs Payments */}
@@ -997,105 +1069,222 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
         </div>
       )}
 
-      {/* PAYMENT / ABONO MODAL */}
-      {isPaymentModalOpen && selectedCustomer && (
-        <div className="modal-overlay" onClick={() => setIsPaymentModalOpen(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2 style={{ fontSize: '1.25rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <DollarSign color="#10b981" />
-              Registrar Pago o Abono
-            </h2>
-            <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
-              Compañero: <strong>{selectedCustomer.name}</strong> • Saldo actual: <strong style={{ color: '#fb923c' }}>{formatCOP(selectedCustomer.totalDebt)}</strong>
-            </p>
+      {/* PAYMENT / ABONO / SALDO A FAVOR MODAL */}
+      {isPaymentModalOpen && selectedCustomer && (() => {
+        const currentDebt = Number(selectedCustomer.totalDebt || 0);
+        const enteredAmount = Number(paymentAmount) || 0;
+        const resultingBalance = currentDebt - enteredAmount;
 
-            <form onSubmit={handleConfirmPayment} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-              <div>
-                <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                  Monto a Pagar (COP): *
-                </label>
-                <div style={{ display: 'flex', gap: '8px' }}>
+        return (
+          <div className="modal-overlay" onClick={() => setIsPaymentModalOpen(false)}>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <h2 style={{ fontSize: '1.25rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <DollarSign color="#10b981" />
+                {currentDebt > 0 ? 'Registrar Pago / Abono o Saldo' : 'Cargar Saldo a Favor'}
+              </h2>
+              <p style={{ fontSize: '0.85rem', color: 'var(--text-muted)', marginBottom: '16px' }}>
+                Compañero: <strong>{selectedCustomer.name}</strong> • Estado actual:{' '}
+                {currentDebt > 0 ? (
+                  <strong style={{ color: '#ea580c' }}>Debe {formatCOP(currentDebt)}</strong>
+                ) : currentDebt < 0 ? (
+                  <strong style={{ color: '#10b981' }}>Tiene +{formatCOP(Math.abs(currentDebt))} a favor</strong>
+                ) : (
+                  <strong style={{ color: '#64748b' }}>Al día ($0)</strong>
+                )}
+              </p>
+
+              <form onSubmit={handleConfirmPayment} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                <div>
+                  <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                    {currentDebt > 0 ? 'Monto a Abonar / Pagar (COP): *' : 'Monto de Dinero a Favor a Cargar (COP): *'}
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    <input 
+                      type="number"
+                      className="input"
+                      required
+                      min="100"
+                      value={paymentAmount}
+                      onChange={(e) => setPaymentAmount(e.target.value)}
+                      placeholder="Monto en COP"
+                      style={{ fontSize: '1.1rem', fontWeight: 700 }}
+                      autoFocus
+                    />
+                    {currentDebt > 0 && (
+                      <button 
+                        type="button" 
+                        className="btn btn-secondary"
+                        onClick={() => setPaymentAmount(currentDebt.toString())}
+                        style={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}
+                        title="Pagar la totalidad de la deuda exacta"
+                      >
+                        Pagar Deuda Total
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Chips de monto rápido */}
+                  <div style={{ display: 'flex', gap: '6px', marginTop: '8px', flexWrap: 'wrap' }}>
+                    {[5000, 10000, 20000, 50000].map(val => (
+                      <button
+                        key={val}
+                        type="button"
+                        className="btn-ghost"
+                        style={{
+                          fontSize: '0.74rem',
+                          padding: '4px 8px',
+                          background: '#f8fafc',
+                          border: '1px solid var(--border-subtle)',
+                          borderRadius: '6px',
+                          color: 'var(--text-main)',
+                          cursor: 'pointer'
+                        }}
+                        onClick={() => setPaymentAmount(prev => {
+                          const base = Number(prev) || 0;
+                          return (base + val).toString();
+                        })}
+                      >
+                        +{formatCOP(val)}
+                      </button>
+                    ))}
+                    {paymentAmount && (
+                      <button
+                        type="button"
+                        className="btn-ghost"
+                        style={{ fontSize: '0.74rem', padding: '4px 8px', color: '#dc2626' }}
+                        onClick={() => setPaymentAmount('')}
+                      >
+                        Limpiar
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Previsualización dinámica del saldo resultante */}
+                  {enteredAmount > 0 && (
+                    <div style={{ marginTop: '10px' }}>
+                      {resultingBalance < 0 ? (
+                        <div style={{
+                          background: '#ecfdf5',
+                          border: '1px solid #a7f3d0',
+                          borderRadius: 'var(--radius-md)',
+                          padding: '10px 12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          color: '#047857',
+                          fontSize: '0.84rem'
+                        }}>
+                          <Sparkles size={16} color="#059669" />
+                          <div>
+                            <div>¡El cliente quedará con <strong>saldo a favor</strong>!</div>
+                            <div style={{ fontWeight: 800, fontSize: '0.95rem' }}>
+                              ✨ Saldo a favor: +{formatCOP(Math.abs(resultingBalance))}
+                            </div>
+                          </div>
+                        </div>
+                      ) : resultingBalance === 0 ? (
+                        <div style={{
+                          background: '#eff6ff',
+                          border: '1px solid #bfdbfe',
+                          borderRadius: 'var(--radius-md)',
+                          padding: '10px 12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          color: '#1d4ed8',
+                          fontSize: '0.84rem'
+                        }}>
+                          <CheckCircle2 size={16} color="#2563eb" />
+                          <div>
+                            <div>La deuda quedará totalmente <strong>saldada ($0)</strong></div>
+                            <div style={{ fontSize: '0.76rem', color: '#3b82f6' }}>El compañero quedará 100% al día.</div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{
+                          background: '#fff7ed',
+                          border: '1px solid #fed7aa',
+                          borderRadius: 'var(--radius-md)',
+                          padding: '10px 12px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          color: '#c2410c',
+                          fontSize: '0.84rem'
+                        }}>
+                          <AlertCircle size={16} color="#ea580c" />
+                          <div>
+                            <div>Abono parcial registrado</div>
+                            <div style={{ fontWeight: 800 }}>
+                              Deuda restante: {formatCOP(resultingBalance)}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                    Medio de Pago:
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {['efectivo', 'nequi', 'daviplata'].map(m => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => setPaymentMethod(m)}
+                        style={{
+                          flex: 1,
+                          padding: '8px',
+                          borderRadius: 'var(--radius-sm)',
+                          border: paymentMethod === m ? '2px solid #10b981' : '1px solid var(--border-subtle)',
+                          background: paymentMethod === m ? 'rgba(16, 185, 129, 0.2)' : 'var(--bg-surface-elevated)',
+                          color: paymentMethod === m ? '#34d399' : 'var(--text-muted)',
+                          fontWeight: 700,
+                          fontSize: '0.82rem',
+                          textTransform: 'capitalize',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
+                    Notas u Observaciones (opcional):
+                  </label>
                   <input 
-                    type="number"
-                    className="input"
-                    required
-                    min="1"
-                    max={selectedCustomer.totalDebt}
-                    value={paymentAmount}
-                    onChange={(e) => setPaymentAmount(e.target.value)}
-                    placeholder="Monto"
-                    style={{ fontSize: '1.1rem', fontWeight: 700 }}
+                    type="text" 
+                    className="input" 
+                    placeholder="ej. Dejó plata adelantada para quincena"
+                    value={paymentNotes}
+                    onChange={(e) => setPaymentNotes(e.target.value)}
                   />
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
                   <button 
                     type="button" 
                     className="btn btn-secondary"
-                    onClick={() => setPaymentAmount(selectedCustomer.totalDebt.toString())}
-                    style={{ whiteSpace: 'nowrap', fontSize: '0.8rem' }}
+                    onClick={() => setIsPaymentModalOpen(false)}
                   >
-                    Pago Total
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn btn-success">
+                    <CheckCircle2 size={16} />
+                    {resultingBalance < 0 ? 'Confirmar y Cargar Saldo a Favor' : 'Confirmar Cobro'}
                   </button>
                 </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                  Medio de Pago:
-                </label>
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  {['efectivo', 'nequi', 'daviplata'].map(m => (
-                    <button
-                      key={m}
-                      type="button"
-                      onClick={() => setPaymentMethod(m)}
-                      style={{
-                        flex: 1,
-                        padding: '8px',
-                        borderRadius: 'var(--radius-sm)',
-                        border: paymentMethod === m ? '2px solid #10b981' : '1px solid var(--border-subtle)',
-                        background: paymentMethod === m ? 'rgba(16, 185, 129, 0.2)' : 'var(--bg-surface-elevated)',
-                        color: paymentMethod === m ? '#34d399' : 'var(--text-muted)',
-                        fontWeight: 700,
-                        fontSize: '0.82rem',
-                        textTransform: 'capitalize',
-                        cursor: 'pointer'
-                      }}
-                    >
-                      {m}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div>
-                <label style={{ fontSize: '0.82rem', color: 'var(--text-muted)', display: 'block', marginBottom: '6px' }}>
-                  Notas u Observaciones (opcional):
-                </label>
-                <input 
-                  type="text" 
-                  className="input" 
-                  placeholder="ej. Pago quincena 15 de Octubre"
-                  value={paymentNotes}
-                  onChange={(e) => setPaymentNotes(e.target.value)}
-                />
-              </div>
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '10px' }}>
-                <button 
-                  type="button" 
-                  className="btn btn-secondary"
-                  onClick={() => setIsPaymentModalOpen(false)}
-                >
-                  Cancelar
-                </button>
-                <button type="submit" className="btn btn-success">
-                  <CheckCircle2 size={16} />
-                  Confirmar Cobro
-                </button>
-              </div>
-            </form>
+              </form>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* CREATE / EDIT CUSTOMER MODAL */}
       {isAddCustomerModalOpen && (
@@ -1175,7 +1364,13 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
       {/* MODAL CONFIRM DELETE CUSTOMER */}
       <ConfirmModal
         isOpen={Boolean(deleteTarget)}
-        title={deleteTarget && (deleteTarget.totalDebt || 0) > 0 ? '¿Eliminar compañero con deuda?' : '¿Eliminar compañero?'}
+        title={
+          deleteTarget && (deleteTarget.totalDebt || 0) > 0 
+            ? '¿Eliminar compañero con deuda?' 
+            : deleteTarget && (deleteTarget.totalDebt || 0) < 0 
+              ? '¿Eliminar compañero con saldo a favor?' 
+              : '¿Eliminar compañero?'
+        }
         message={
           deleteTarget ? (
             (deleteTarget.totalDebt || 0) > 0 ? (
@@ -1184,6 +1379,12 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
                 <strong style={{ color: '#ea580c' }}>{formatCOP(deleteTarget.totalDebt)}</strong>.
                 <br /><br />
                 Si lo eliminas, su historial quedará archivado pero ya no aparecerá en el listado de cobro. ¿Deseas eliminarlo de todos modos?
+              </span>
+            ) : (deleteTarget.totalDebt || 0) < 0 ? (
+              <span>
+                <strong>{deleteTarget.name}</strong> tiene un <strong style={{ color: '#16a34a' }}>saldo a favor de +{formatCOP(Math.abs(deleteTarget.totalDebt))}</strong>.
+                <br /><br />
+                Si lo eliminas, este crédito quedará en el historial archivado. ¿Deseas eliminarlo de todos modos?
               </span>
             ) : (
               <span>
