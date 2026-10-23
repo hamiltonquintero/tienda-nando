@@ -29,21 +29,25 @@ export default function NewOrderAlertBanner({ order, onOpenOrdersInbox, onClose 
         justifyContent: 'space-between',
         gap: '12px'
       }}>
-        {/* Icono con animación de pulso */}
+        {/* Robot Mascota sorprendido anunciando el pedido */}
         <div style={{
-          width: '42px',
-          height: '42px',
+          width: '48px',
+          height: '48px',
           borderRadius: '50%',
           background: '#ffffff',
-          color: '#0284c7',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           flexShrink: 0,
-          boxShadow: '0 2px 10px rgba(0,0,0,0.15)',
-          animation: 'bellShake 1.5s ease-in-out infinite'
+          boxShadow: '0 4px 12px rgba(0,0,0,0.18)',
+          padding: '3px',
+          animation: 'bellShake 1.8s ease-in-out infinite'
         }}>
-          <Bell size={22} className="alert-bell-icon" />
+          <img 
+            src="/robot/robot-sorprendido.svg" 
+            alt="Robot avisando pedido" 
+            style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+          />
         </div>
 
         {/* Textos */}

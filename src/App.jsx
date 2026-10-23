@@ -15,6 +15,7 @@ import OrdersInboxModal from './components/OrdersInboxModal';
 import ShareCatalogModal from './components/ShareCatalogModal';
 import DevCreditBadge from './components/DevCreditBadge';
 import NewOrderAlertBanner from './components/NewOrderAlertBanner';
+import StoreAssistant from './components/StoreAssistant';
 
 export default function App() {
   const store = useStore();
@@ -400,6 +401,13 @@ export default function App() {
         order={store.incomingOrderAlert}
         onOpenOrdersInbox={() => setIsOrdersInboxOpen(true)}
         onClose={store.dismissIncomingOrderAlert}
+      />
+      {/* Asistente Virtual Robot de Surtimueve Más */}
+      <StoreAssistant 
+        store={store}
+        onOpenOrdersInbox={() => setIsOrdersInboxOpen(true)}
+        onNavigateTab={(tab) => setActiveTab(tab)}
+        onOpenCatalog={() => setIsCatalogView(true)}
       />
       {/* Badge Flotante Animado con Colores y Movimiento */}
       <DevCreditBadge isCatalog={false} />

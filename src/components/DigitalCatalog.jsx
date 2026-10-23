@@ -9,6 +9,7 @@ import { CATEGORIES, STORE_OWNER_PHONE } from '../data/initialProducts';
 import { formatCOP } from '../data/store';
 import ProductThumbnail from './ProductThumbnail';
 import DevCreditBadge from './DevCreditBadge';
+import StoreAssistant from './StoreAssistant';
 
 export default function DigitalCatalog({ 
   products, 
@@ -933,6 +934,14 @@ Quedo atento cuando lo tengas listo. ¡Muchas gracias! 🙌`;
           </div>
         </div>
       )}
+
+      {/* Asistente Robot para el Cliente en el Catálogo */}
+      <StoreAssistant 
+        isCatalog={true}
+        cart={cart}
+        onOpenCart={() => setIsCartOpen(true)}
+        onSelectCategory={(cat) => setSelectedCategory(cat)}
+      />
 
       {/* Badge Flotante Animado con Colores y Movimiento */}
       <DevCreditBadge isCatalog={true} />

@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 120" role="img" aria-label="Robot mascota sorprendido">
+<defs><linearGradient id="shell" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFFFFF"/><stop offset="1" stop-color="#B8D9FF"/></linearGradient><linearGradient id="screen" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#11284C"/><stop offset="1" stop-color="#061329"/></linearGradient></defs>
+<ellipse cx="50" cy="112" rx="25" ry="4" fill="#8BB9E8" opacity=".28"/>
+<path d="M31 78 Q22 81 23 94 L29 101" stroke="#B7D7FF" stroke-width="10" fill="none" stroke-linecap="round"/><path d="M69 78 Q78 81 77 94 L71 101" stroke="#B7D7FF" stroke-width="10" fill="none" stroke-linecap="round"/>
+<path d="M35 75 Q50 69 65 75 L69 97 Q50 105 31 97 Z" fill="url(#shell)" stroke="#2479D8" stroke-width="2"/>
+<path d="M43 99 L40 108 M57 99 L60 108" stroke="#B7D7FF" stroke-width="9" stroke-linecap="round"/>
+<path d="M32 108 h13 M55 108 h13" stroke="#2479D8" stroke-width="4" stroke-linecap="round"/>
+<circle cx="27" cy="42" r="9" fill="#2479D8"/><circle cx="27" cy="42" r="5" fill="#70D9FF"/>
+<circle cx="73" cy="42" r="9" fill="#2479D8"/><circle cx="73" cy="42" r="5" fill="#70D9FF"/>
+<rect x="25" y="18" width="50" height="47" rx="17" fill="url(#shell)" stroke="#2479D8" stroke-width="2.5"/>
+<rect x="30" y="23" width="40" height="36" rx="13" fill="url(#screen)"/>
+<circle cx="42" cy="43" r="4.5" fill="#27D9FF"/><circle cx="58" cy="43" r="4.5" fill="#27D9FF"/><ellipse cx="50" cy="54" rx="4" ry="5" fill="#27D9FF"/>
+<path d="M39 79 Q50 74 61 79" stroke="#2479D8" stroke-width="2" fill="none"/>
+<circle cx="50" cy="87" r="5" fill="#087DDA"/><path d="M47 87 h6 M50 84 v6" stroke="#FFFFFF" stroke-width="1.5" stroke-linecap="round"/>
+
+</svg>

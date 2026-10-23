@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Robot mascota</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="demo">
+    <p class="eyebrow">ASISTENTE VIRTUAL</p>
+    <h1>¡Hola! Soy tu robot mascota</h1>
+    <p>Estoy aquí para ayudarte. Prueba los estados de mi personaje.</p>
+    <div class="robot-stage">
+      <img id="robot-demo" class="robot-mascota robot-grande" src="assets/robot/robot-saludando.svg" alt="Robot mascota saludando">
+      <p id="robot-caption" aria-live="polite">¡Hola! ¿En qué te puedo ayudar?</p>
+    </div>
+    <div class="controls" aria-label="Cambiar pose del robot">
+      <button data-pose="idle">Normal</button><button data-pose="saludando">Saludar</button>
+      <button data-pose="pensando">Pensar</button><button data-pose="feliz">Feliz</button>
+      <button data-pose="triste">Triste</button><button data-pose="error">Error</button>
+      <button data-pose="trabajando">Trabajar</button><button data-pose="celebrando">Celebrar</button>
+      <button data-pose="senalando">Señalar</button><button data-pose="sorprendido">Sorpresa</button>
+    </div>
+  </main>
+
+  <button class="robot-launcher" id="robot-launcher" aria-label="Abrir asistente virtual" aria-expanded="false">
+    <img src="assets/robot/robot-saludando.svg" alt="">
+    <span class="launcher-dot"></span>
+  </button>
+  <section class="robot-chat" id="robot-chat" aria-label="Asistente virtual" hidden>
+    <header><strong>Robot asistente</strong><button id="robot-close" aria-label="Cerrar asistente">×</button></header>
+    <div class="chat-content">
+      <img id="chat-robot" src="assets/robot/robot-feliz.svg" alt="" />
+      <p>¡Hola! Soy tu asistente virtual. ¿Qué necesitas hacer?</p>
+    </div>
+    <form id="robot-form"><input id="robot-input" placeholder="Escribe tu mensaje…" aria-label="Tu mensaje"><button>Enviar</button></form>
+    <p class="chat-note" id="chat-note" aria-live="polite">Demo visual: conecta aquí tu propio servicio de chat.</p>
+  </section>
+  <script src="script.js"></script>
+</body>
+</html>
