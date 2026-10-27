@@ -246,6 +246,7 @@ export default function App() {
             onFiarToCustomer={handleFiarToCustomer}
             onCancelSale={store.cancelSale}
             activeAdmin={store.activeAdmin}
+            admins={store.admins}
           />
         )}
 
@@ -270,6 +271,7 @@ export default function App() {
             onClosePeriod={store.closeCurrentPeriod}
             onCancelSale={store.cancelSale}
             activeAdmin={store.activeAdmin}
+            admins={store.admins}
           />
         )}
 
