@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Share2, Copy, Check, MessageSquare, ExternalLink, X, QrCode } from 'lucide-react';
+import { openWhatsApp } from '../utils/whatsapp';
 
 export default function ShareCatalogModal({ isOpen, onClose, onOpenCatalogView }) {
   const [copied, setCopied] = useState(false);
@@ -24,8 +25,7 @@ Pueden pagar de contado o cargarlo al fiao quincenal. ¡A la orden! 🍪🥤🍫
   };
 
   const handleShareWhatsApp = () => {
-    const url = `https://wa.me/?text=${encodeURIComponent(shareText)}`;
-    window.open(url, '_blank');
+    openWhatsApp('', shareText);
   };
 
   return (

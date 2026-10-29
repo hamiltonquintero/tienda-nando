@@ -7,6 +7,7 @@ import {
 import confetti from 'canvas-confetti';
 import { CATEGORIES, STORE_OWNER_PHONE } from '../data/initialProducts';
 import { formatCOP } from '../data/store';
+import { openWhatsApp } from '../utils/whatsapp';
 import ProductThumbnail from './ProductThumbnail';
 import DevCreditBadge from './DevCreditBadge';
 import StoreAssistant from './StoreAssistant';
@@ -210,10 +211,7 @@ ${itemsList}
 
 Quedo atento cuando lo tengas listo. ¡Muchas gracias! 🙌`;
 
-    const cleanPhone = (STORE_OWNER_PHONE || '573174374336').replace(/\D/g, '');
-    const destinationNumber = cleanPhone.startsWith('57') ? cleanPhone : `57${cleanPhone}`;
-    const url = `https://wa.me/${destinationNumber}?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
+    openWhatsApp(STORE_OWNER_PHONE || '573174374336', message);
   };
 
   return (

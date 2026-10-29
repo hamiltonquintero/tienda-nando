@@ -7,6 +7,7 @@ import {
 import confetti from 'canvas-confetti';
 import { CATEGORIES } from '../data/initialProducts';
 import { formatCOP } from '../data/store';
+import { openWhatsApp } from '../utils/whatsapp';
 import ConfirmModal from './ConfirmModal';
 import ProductThumbnail from './ProductThumbnail';
 
@@ -136,16 +137,8 @@ export default function POS({
 
   const handleSendWhatsAppReceipt = (customPhone = '') => {
     if (!lastCompletedSale) return;
-    const text = encodeURIComponent(generateReceiptWhatsAppMessage(lastCompletedSale));
-    const phoneToUse = (customPhone || lastCompletedSale.phone || '').replace(/\D/g, '');
-    let url = '';
-    if (phoneToUse.length >= 10) {
-      const fullPhone = phoneToUse.startsWith('57') ? phoneToUse : `57${phoneToUse}`;
-      url = `https://wa.me/${fullPhone}?text=${text}`;
-    } else {
-      url = `https://wa.me/?text=${text}`;
-    }
-    window.open(url, '_blank');
+    const phoneToUse = customPhone || lastCompletedSale.phone || '';
+    openWhatsApp(phoneToUse, generateReceiptWhatsAppMessage(lastCompletedSale));
   };
 
   const handleCopyReceipt = () => {

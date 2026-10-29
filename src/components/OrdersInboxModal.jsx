@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { formatCOP } from '../data/store';
+import { openWhatsApp } from '../utils/whatsapp';
 
 export default function OrdersInboxModal({ 
   isOpen, 
@@ -60,18 +61,8 @@ export default function OrdersInboxModal({
   };
 
   const handleNotifyCustomerReady = (order) => {
-    const text = encodeURIComponent(
-      `¡Hola ${order.customerName.split(' ')[0]}! 👋 Tu pedido de Surtimueve Más ya está listo para recoger en la caja. ¡Te esperamos!`
-    );
-    const cleanPhone = (order.customerPhone || '').replace(/\D/g, '');
-    let url = '';
-    if (cleanPhone.length >= 10) {
-      const fullPhone = cleanPhone.startsWith('57') ? cleanPhone : `57${cleanPhone}`;
-      url = `https://wa.me/${fullPhone}?text=${text}`;
-    } else {
-      url = `https://wa.me/?text=${text}`;
-    }
-    window.open(url, '_blank');
+    const text = `¡Hola ${order.customerName.split(' ')[0]}! 👋 Tu pedido de Surtimueve Más ya está listo para recoger en la caja. ¡Te esperamos!`;
+    openWhatsApp(order.customerPhone || '', text);
   };
 
   return (

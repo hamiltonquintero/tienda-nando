@@ -8,6 +8,7 @@ import {
 import confetti from 'canvas-confetti';
 import { formatCOP } from '../data/store';
 import ConfirmModal from './ConfirmModal';
+import AccountSummaryModal from './AccountSummaryModal';
 
 export default function DebtorsLedger({ 
   customers, 
@@ -32,6 +33,7 @@ export default function DebtorsLedger({
   const [paymentMethod, setPaymentMethod] = useState('efectivo');
   const [paymentNotes, setPaymentNotes] = useState('');
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
+  const [summaryModalCustomer, setSummaryModalCustomer] = useState(null);
 
   // New / Edit Customer Form State
   const [editingCustomer, setEditingCustomer] = useState(null);
@@ -151,59 +153,9 @@ export default function DebtorsLedger({
     return payments.filter(p => p.customerId === selectedCustomer.id);
   }, [payments, selectedCustomer]);
 
-  // Generate WhatsApp Message
-  const generateWhatsAppMessage = (customer) => {
-    // Solo incluir ventas fiadas del período actual
-    const custSales = sales.filter(s => 
-      s.customerId === customer.id && 
-      s.type === 'fiado' && 
-      currentPeriod && s.periodId === currentPeriod.id
-    );
-    
-    // Group items bought
-    const itemsSummary = {};
-    custSales.forEach(sale => {
-      sale.items.forEach(item => {
-        if (!itemsSummary[item.name]) {
-          itemsSummary[item.name] = { qty: 0, total: 0 };
-        }
-        itemsSummary[item.name].qty += item.quantity;
-        itemsSummary[item.name].total += item.total;
-      });
-    });
-
-    let itemsText = '';
-    const itemKeys = Object.keys(itemsSummary);
-    if (itemKeys.length > 0) {
-      itemsText = itemKeys.map(name => `• ${name} (x${itemsSummary[name].qty}) - ${formatCOP(itemsSummary[name].total)}`).join('\n');
-    } else {
-      itemsText = '• Consumos acumulados de la quincena';
-    }
-
-    const message = `¡Hola ${customer.name.split(' ')[0]}! 👋 Te comparto el resumen de tu cuenta en *Surtimueve más* para esta quincena:
-
-${itemsText}
-
-💰 *Saldo total pendiente:* *${formatCOP(customer.totalDebt)}*
-
-Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas gracias por tu compra! 🙌`;
-
-    return message;
-  };
-
+  // El mensaje de cobro ahora lo genera AccountSummaryModal (imagen + texto + llave Nu)
   const handleOpenWhatsApp = (customer) => {
-    const text = encodeURIComponent(generateWhatsAppMessage(customer));
-    const cleanPhone = (customer.phone || '').replace(/\D/g, '');
-    let url = '';
-    if (cleanPhone.length >= 10) {
-      // Add Colombia prefix 57 if not present
-      const fullPhone = cleanPhone.startsWith('57') ? cleanPhone : `57${cleanPhone}`;
-      url = `https://wa.me/${fullPhone}?text=${text}`;
-    } else {
-      // Open general WhatsApp web / share
-      url = `https://wa.me/?text=${text}`;
-    }
-    window.open(url, '_blank');
+    setSummaryModalCustomer(customer);
   };
 
   const handleOpenPayment = (customer) => {
@@ -668,6 +620,22 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
                               {hasDebt ? 'Abonar' : '+ Cargar Saldo'}
                             </button>
 
+                            {/* ESTADO DE CUENTA / WHATSAPP CON IMAGEN Y LLAVE NU */}
+                            <button
+                              type="button"
+                              className="btn"
+                              style={{ 
+                                background: hasDebt ? '#25D366' : '#10b981', 
+                                color: '#fff', 
+                                padding: '6px 9px', 
+                                fontSize: '0.78rem' 
+                              }}
+                              title={hasDebt ? "Enviar cuenta de cobro por WhatsApp con imagen y llave Nu" : "Ver / Enviar comprobante de saldo a favor"}
+                              onClick={() => handleOpenWhatsApp(c)}
+                            >
+                              <MessageSquare size={13} />
+                            </button>
+
                             {/* VER DETALLE */}
                             <button
                               type="button"
@@ -806,18 +774,18 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
                     Detalle
                   </button>
 
-                  {hasDebt && (
+                  {(hasDebt || hasCredit) && (
                     <button
                       type="button"
                       className="btn"
                       style={{ 
-                        background: '#25D366', 
+                        background: hasDebt ? '#25D366' : '#10b981', 
                         color: '#ffffff', 
                         padding: '8px 10px', 
                         fontSize: '0.8rem',
-                        boxShadow: '0 2px 8px rgba(37, 211, 102, 0.3)'
+                        boxShadow: hasDebt ? '0 2px 8px rgba(37, 211, 102, 0.3)' : '0 2px 8px rgba(16, 185, 129, 0.3)'
                       }}
-                      title="Cobrar por WhatsApp con resumen"
+                      title={hasDebt ? "Cobrar por WhatsApp con resumen, imagen y llave Nu" : "Ver / Enviar comprobante de saldo a favor"}
                       onClick={() => handleOpenWhatsApp(c)}
                     >
                       <MessageSquare size={14} />
@@ -913,16 +881,20 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
 
             {/* Quick action strip in detail */}
             <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
-              {(selectedCustomer.totalDebt || 0) > 0 && (
-                <button 
-                  className="btn"
-                  style={{ flex: 1, background: '#25D366', color: '#fff' }}
-                  onClick={() => handleOpenWhatsApp(selectedCustomer)}
-                >
-                  <MessageSquare size={16} />
-                  Enviar Cuenta por WhatsApp
-                </button>
-              )}
+              <button 
+                className="btn"
+                style={{ 
+                  flex: 1, 
+                  background: (selectedCustomer.totalDebt || 0) > 0 ? '#25D366' : '#10b981', 
+                  color: '#fff' 
+                }}
+                onClick={() => handleOpenWhatsApp(selectedCustomer)}
+              >
+                <MessageSquare size={16} />
+                {(selectedCustomer.totalDebt || 0) > 0 
+                  ? 'Estado de Cuenta / Cobro WhatsApp' 
+                  : 'Comprobante Saldo a Favor'}
+              </button>
               <button 
                 className="btn"
                 style={{ 
@@ -1553,6 +1525,16 @@ Puedes cancelarlo en efectivo o por transferencia (Nequi / Daviplata). ¡Muchas 
           </div>
         </div>
       )}
+
+      {/* MODAL DE RESUMEN DE CUENTA / COBRO DIGITAL CON IMAGEN Y LLAVE NU */}
+      <AccountSummaryModal 
+        isOpen={Boolean(summaryModalCustomer)}
+        onClose={() => setSummaryModalCustomer(null)}
+        customer={summaryModalCustomer}
+        sales={sales}
+        currentPeriod={currentPeriod}
+        activeAdmin={activeAdmin}
+      />
     </div>
   );
 }
