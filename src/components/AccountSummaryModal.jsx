@@ -73,6 +73,7 @@ export default function AccountSummaryModal({
   const [shareFeedback, setShareFeedback] = useState('');
 
   const canvasRef = useRef(null);
+  const imageBlobRef = useRef(null);
 
   // Inicializar teléfono del cliente
   useEffect(() => {
@@ -85,8 +86,16 @@ export default function AccountSummaryModal({
     setShareFeedback('');
   }, [customer, isOpen]);
 
-  // Periodo actual
-  const periodName = currentPeriod?.name || getCurrentQuincenaName();
+  // Periodo actual (traduce meses en inglés si el nombre viene así desde la BD)
+  const periodName = useMemo(() => {
+    const raw = currentPeriod?.name || getCurrentQuincenaName();
+    const EN_ES = {
+      January: 'Enero', February: 'Febrero', March: 'Marzo', April: 'Abril',
+      May: 'Mayo', June: 'Junio', July: 'Julio', August: 'Agosto',
+      September: 'Septiembre', October: 'Octubre', November: 'Noviembre', December: 'Diciembre'
+    };
+    return raw.replace(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\b/g, m => EN_ES[m]);
+  }, [currentPeriod]);
 
   // 1. Filtrar ventas de esta quincena para este cliente
   const currentPeriodSales = useMemo(() => {
@@ -131,7 +140,7 @@ export default function AccountSummaryModal({
     return 0;
   }, [hasDebt, totalDebt, currentPeriodTotal]);
 
-  const itemsList = Object.entries(itemsSummary);
+  const itemsList = useMemo(() => Object.entries(itemsSummary), [itemsSummary]);
 
   // 4. Generar texto para WhatsApp
   const whatsAppMessage = useMemo(() => {
@@ -457,6 +466,10 @@ _(O en efectivo en la caja registradora de la tienda)_
         if (!isCancelled) {
           const uri = canvas.toDataURL('image/png', 0.95);
           setPreviewImageUri(uri);
+          // Guardar también el Blob listo para copiarlo al portapapeles al instante
+          canvas.toBlob((blob) => {
+            if (!isCancelled) imageBlobRef.current = blob;
+          }, 'image/png');
         }
       } catch (err) {
         console.error('[AccountSummaryModal] Error generando imagen canvas:', err);
@@ -509,33 +522,51 @@ _(O en efectivo en la caja registradora de la tienda)_
     document.body.removeChild(a);
   };
 
+  // Botón principal: va DIRECTO al chat de WhatsApp del compañero.
+  // Antes copia la imagen al portapapeles para pegarla con Ctrl+V (o "Pegar" en el celular).
   const handleShareImageOrWhatsApp = async () => {
-    // Si el navegador soporta compartir archivos (móviles Android / iOS)
-    if (previewImageUri && navigator.canShare) {
+    let imageCopied = false;
+    const blob = imageBlobRef.current;
+    if (blob && navigator.clipboard?.write && typeof window.ClipboardItem !== 'undefined') {
       try {
-        const response = await fetch(previewImageUri);
-        const blob = await response.blob();
-        const file = new File([blob], `Estado_Cuenta_${customer.name}.png`, { type: 'image/png' });
-
-        if (navigator.canShare({ files: [file] })) {
-          await navigator.share({
-            files: [file],
-            title: `Estado de Cuenta - ${customer.name}`,
-            text: whatsAppMessage
-          });
-          setShareFeedback('¡Compartido con éxito!');
-          setTimeout(() => setShareFeedback(''), 3000);
-          return;
-        }
+        await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
+        imageCopied = true;
       } catch (e) {
-        // Si el usuario cerró el menú de compartir, no abrir WhatsApp por detrás
-        if (e?.name === 'AbortError') return;
-        console.warn('Share API falló:', e);
+        console.warn('No se pudo copiar la imagen al portapapeles:', e);
       }
     }
 
-    // Fallback: Abrir WhatsApp Web / App con el texto enriquecido
     openWhatsApp(customPhone, whatsAppMessage);
+
+    setShareFeedback(
+      imageCopied
+        ? '✅ Imagen copiada. En el chat de WhatsApp pega la imagen con Ctrl + V (o mantén presionado → Pegar).'
+        : 'Se abrió WhatsApp con el mensaje. Si quieres enviar la imagen, usa "Descargar Imagen" y adjúntala.'
+    );
+    setTimeout(() => setShareFeedback(''), 9000);
+  };
+
+  // Botón secundario: menú nativo de compartir (útil en celular para adjuntar la foto)
+  const handleNativeShareImage = async () => {
+    const blob = imageBlobRef.current;
+    if (!blob || !navigator.canShare) {
+      handleDownloadImage();
+      return;
+    }
+    try {
+      const file = new File([blob], `Estado_Cuenta_${customer.name}.png`, { type: 'image/png' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: `Estado de Cuenta - ${customer.name}`,
+          text: whatsAppMessage
+        });
+        return;
+      }
+      handleDownloadImage();
+    } catch (e) {
+      if (e?.name !== 'AbortError') console.warn('Share API falló:', e);
+    }
   };
 
   return (
@@ -872,7 +903,7 @@ _(O en efectivo en la caja registradora de la tienda)_
             }}
           >
             <MessageSquare size={18} />
-            <span>Enviar Comprobante por WhatsApp</span>
+            <span>Abrir Chat de WhatsApp (imagen copiada)</span>
           </button>
 
           {/* Botones Secundarios */}
@@ -880,7 +911,7 @@ _(O en efectivo en la caja registradora de la tienda)_
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={handleDownloadImage}
+              onClick={handleNativeShareImage}
               disabled={isGeneratingImg}
               style={{
                 flex: 1,
@@ -891,10 +922,10 @@ _(O en efectivo en la caja registradora de la tienda)_
                 gap: '5px',
                 padding: '8px'
               }}
-              title="Descargar imagen PNG nítida"
+              title="Abrir el menú de compartir del dispositivo (ideal en celular para adjuntar la foto)"
             >
-              <Download size={14} />
-              {isGeneratingImg ? 'Generando imagen…' : 'Descargar Imagen'}
+              <Share2 size={14} />
+              {isGeneratingImg ? 'Generando imagen…' : 'Compartir Imagen'}
             </button>
 
             <button
