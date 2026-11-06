@@ -1532,6 +1532,7 @@ export default function DebtorsLedger({
         onClose={() => setSummaryModalCustomer(null)}
         customer={summaryModalCustomer}
         sales={sales}
+        payments={payments}
         currentPeriod={currentPeriod}
         activeAdmin={activeAdmin}
       />

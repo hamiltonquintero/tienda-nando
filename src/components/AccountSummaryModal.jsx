@@ -61,6 +61,7 @@ export default function AccountSummaryModal({
   onClose,
   customer,
   sales = [],
+  payments = [],
   currentPeriod,
   activeAdmin
 }) {
@@ -131,14 +132,33 @@ export default function AccountSummaryModal({
   const creditAmount = Math.abs(totalDebt);
 
   // Saldo de quincenas anteriores
+  // Se calcula como: ventas fiado de períodos anteriores - todos los pagos del cliente.
+  // Esto es correcto incluso cuando hay abonos parciales, porque totalDebt (neto en BD)
+  // ya incluye los descuentos de pagos, y la deuda anterior = lo que NO es de esta quincena.
   const previousDebt = useMemo(() => {
-    if (!hasDebt) return 0;
-    if (currentPeriodTotal === 0) return totalDebt;
-    if (totalDebt > currentPeriodTotal) {
-      return totalDebt - currentPeriodTotal;
-    }
-    return 0;
-  }, [hasDebt, totalDebt, currentPeriodTotal]);
+    if (!customer || !hasDebt) return 0;
+
+    // Suma de ventas fiado de períodos anteriores
+    const prevSalesTotal = sales
+      .filter(s =>
+        s.customerId === customer.id &&
+        s.type === 'fiado' &&
+        currentPeriod &&
+        s.periodId !== currentPeriod.id
+      )
+      .reduce((sum, s) => sum + Number(s.total), 0);
+
+    if (prevSalesTotal === 0) return 0;
+
+    // Suma de todos los pagos/abonos del cliente (de cualquier período)
+    const totalPaid = payments
+      .filter(p => p.customerId === customer.id)
+      .reduce((sum, p) => sum + Number(p.amount), 0);
+
+    // Lo que queda pendiente de quincenas anteriores (descontando lo que ya pagó)
+    const net = prevSalesTotal - totalPaid;
+    return net > 0 ? net : 0;
+  }, [customer, hasDebt, sales, payments, currentPeriod]);
 
   const itemsList = useMemo(() => Object.entries(itemsSummary), [itemsSummary]);
 
@@ -481,7 +501,7 @@ _(O en efectivo en la caja registradora de la tienda)_
     generateImage();
 
     return () => { isCancelled = true; };
-  }, [isOpen, customer, itemsList, hasCredit, creditAmount, previousDebt, totalDebt, periodName]);
+  }, [isOpen, customer, itemsList, hasCredit, creditAmount, previousDebt, totalDebt, periodName, payments]);
 
   if (!isOpen || !customer) return null;
 
