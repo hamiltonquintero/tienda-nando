@@ -98,15 +98,34 @@ export default function AccountSummaryModal({
     return raw.replace(/\b(January|February|March|April|May|June|July|August|September|October|November|December)\b/g, m => EN_ES[m]);
   }, [currentPeriod]);
 
-  // 1. Filtrar ventas de esta quincena para este cliente
+  // 1. Filtrar ventas de ESTA QUINCENA CALENDARIO para este cliente.
+  //
+  // Usamos la fecha real de la venta (s.date) en lugar de solo el periodId,
+  // porque el período en BD puede llevar meses abierto sin haberse cerrado,
+  // acumulando ventas de quincenas anteriores con el mismo periodId.
+  //
+  // "Quincena actual" = del día 1 al 15 (primera) o del 16 al fin de mes (segunda).
   const currentPeriodSales = useMemo(() => {
     if (!customer) return [];
-    return sales.filter(s => 
-      s.customerId === customer.id && 
-      s.type === 'fiado' && 
-      currentPeriod && s.periodId === currentPeriod.id
+
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth(); // 0-indexed
+    const day = now.getDate();
+
+    // Inicio y fin de la quincena calendario actual
+    const quincenaStart = new Date(year, month, day <= 15 ? 1 : 16, 0, 0, 0, 0);
+    const quincenaEnd   = new Date(year, month, day <= 15 ? 15 : 
+      new Date(year, month + 1, 0).getDate(), // último día del mes
+      23, 59, 59, 999
     );
-  }, [sales, customer, currentPeriod]);
+
+    return sales.filter(s => {
+      if (s.customerId !== customer.id || s.type !== 'fiado') return false;
+      const saleDate = new Date(s.date);
+      return saleDate >= quincenaStart && saleDate <= quincenaEnd;
+    });
+  }, [sales, customer]);
 
   // 2. Agrupar consumos de la quincena
   const { itemsSummary, currentPeriodTotal } = useMemo(() => {
@@ -132,33 +151,35 @@ export default function AccountSummaryModal({
   const creditAmount = Math.abs(totalDebt);
 
   // Saldo de quincenas anteriores
-  // Se calcula como: ventas fiado de períodos anteriores - todos los pagos del cliente.
-  // Esto es correcto incluso cuando hay abonos parciales, porque totalDebt (neto en BD)
-  // ya incluye los descuentos de pagos, y la deuda anterior = lo que NO es de esta quincena.
+  // Ventas fiado ANTERIORES a esta quincena calendario - pagos totales del cliente.
   const previousDebt = useMemo(() => {
     if (!customer || !hasDebt) return 0;
 
-    // Suma de ventas fiado de períodos anteriores
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const day = now.getDate();
+    const quincenaStart = new Date(year, month, day <= 15 ? 1 : 16, 0, 0, 0, 0);
+
+    // Ventas fiado anteriores a esta quincena
     const prevSalesTotal = sales
       .filter(s =>
         s.customerId === customer.id &&
         s.type === 'fiado' &&
-        currentPeriod &&
-        s.periodId !== currentPeriod.id
+        new Date(s.date) < quincenaStart
       )
       .reduce((sum, s) => sum + Number(s.total), 0);
 
     if (prevSalesTotal === 0) return 0;
 
-    // Suma de todos los pagos/abonos del cliente (de cualquier período)
+    // Total de abonos/pagos del cliente
     const totalPaid = payments
       .filter(p => p.customerId === customer.id)
       .reduce((sum, p) => sum + Number(p.amount), 0);
 
-    // Lo que queda pendiente de quincenas anteriores (descontando lo que ya pagó)
     const net = prevSalesTotal - totalPaid;
     return net > 0 ? net : 0;
-  }, [customer, hasDebt, sales, payments, currentPeriod]);
+  }, [customer, hasDebt, sales, payments]);
 
   const itemsList = useMemo(() => Object.entries(itemsSummary), [itemsSummary]);
 
