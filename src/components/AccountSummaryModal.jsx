@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { 
-  X, MessageSquare, Download, Share2, Copy, Check, 
+  X, MessageSquare, Download, Copy, Check, 
   Sparkles, ShieldCheck, CheckCircle2, AlertCircle, Phone,
-  CreditCard, ExternalLink, RefreshCw
+  CreditCard, ExternalLink
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { formatCOP, getCurrentQuincenaName } from '../data/store';
@@ -522,51 +522,96 @@ _(O en efectivo en la caja registradora de la tienda)_
     document.body.removeChild(a);
   };
 
-  // Botón principal: va DIRECTO al chat de WhatsApp del compañero.
-  // Antes copia la imagen al portapapeles para pegarla con Ctrl+V (o "Pegar" en el celular).
-  const handleShareImageOrWhatsApp = async () => {
-    let imageCopied = false;
+  // Detecta si el dispositivo puede compartir archivos con la Web Share API (móvil/tablet)
+  const canShareFiles = () => {
+    if (!navigator.canShare) return false;
     const blob = imageBlobRef.current;
+    if (!blob) return false;
+    try {
+      const testFile = new File([blob], 'test.png', { type: 'image/png' });
+      return navigator.canShare({ files: [testFile] });
+    } catch {
+      return false;
+    }
+  };
+
+  /**
+   * Botón PRINCIPAL: enviar imagen por WhatsApp.
+   *
+   * - Móvil/tablet (Web Share API disponible): abre el menú nativo de compartir
+   *   con el archivo PNG adjunto → el usuario elige WhatsApp → la imagen llega
+   *   directamente al chat sin ningún paso extra.
+   *
+   * - Desktop (sin Web Share API): copia la imagen PNG al portapapeles y abre
+   *   WhatsApp Web con el número del compañero. El admin solo tiene que pegar
+   *   la imagen con Ctrl+V en el cuadro de texto de WhatsApp y enviarla.
+   */
+  const handleShareImageOrWhatsApp = async () => {
+    const blob = imageBlobRef.current;
+
+    // ── RUTA MÓVIL: Web Share API con archivo adjunto ──────────────────────
+    if (blob && canShareFiles()) {
+      try {
+        const cleanName = customer.name.replace(/[^a-zA-Z0-9]/g, '_');
+        const file = new File([blob], `Cuenta_${cleanName}.png`, { type: 'image/png' });
+        await navigator.share({
+          files: [file],
+          title: `Cuenta de cobro – ${customer.name}`,
+        });
+        // El usuario ya eligió WhatsApp (u otra app) en el menú nativo;
+        // no hace falta mostrar feedback adicional.
+        return;
+      } catch (e) {
+        // AbortError = usuario canceló el menú; cualquier otro error cae al fallback.
+        if (e?.name === 'AbortError') return;
+        console.warn('[AccountSummaryModal] Web Share falló, usando fallback de portapapeles:', e);
+      }
+    }
+
+    // ── RUTA DESKTOP: copiar imagen al portapapeles + abrir WhatsApp Web ──
+    let imageCopied = false;
     if (blob && navigator.clipboard?.write && typeof window.ClipboardItem !== 'undefined') {
       try {
         await navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
         imageCopied = true;
       } catch (e) {
-        console.warn('No se pudo copiar la imagen al portapapeles:', e);
+        console.warn('[AccountSummaryModal] No se pudo copiar imagen al portapapeles:', e);
       }
     }
 
-    openWhatsApp(customPhone, whatsAppMessage);
+    // Abre WhatsApp con el número del compañero (sin texto largo para dejar espacio a la imagen)
+    const shortMsg = hasCredit
+      ? `¡Hola ${customer.name.split(' ')[0]}! 👋 Te comparto tu saldo a favor en *Surtimueve más* 🎉`
+      : `¡Hola ${customer.name.split(' ')[0]}! 👋 Te comparto tu estado de cuenta en *Surtimueve más* 📋`;
+    openWhatsApp(customPhone, shortMsg);
 
-    setShareFeedback(
-      imageCopied
-        ? '✅ Imagen copiada. En el chat de WhatsApp pega la imagen con Ctrl + V (o mantén presionado → Pegar).'
-        : 'Se abrió WhatsApp con el mensaje. Si quieres enviar la imagen, usa "Descargar Imagen" y adjúntala.'
-    );
-    setTimeout(() => setShareFeedback(''), 9000);
+    if (imageCopied) {
+      setShareFeedback('✅ Imagen copiada al portapapeles. En WhatsApp pega con Ctrl + V (o mantén presionado → Pegar) y envía.');
+    } else {
+      setShareFeedback('Se abrió WhatsApp. Usa el botón "Descargar PNG" para guardar la imagen y adjuntarla manualmente al chat.');
+    }
+    setTimeout(() => setShareFeedback(''), 10000);
   };
 
-  // Botón secundario: menú nativo de compartir (útil en celular para adjuntar la foto)
+  // Botón secundario "Compartir / Descargar": descarga el PNG (fallback universal)
   const handleNativeShareImage = async () => {
     const blob = imageBlobRef.current;
-    if (!blob || !navigator.canShare) {
-      handleDownloadImage();
-      return;
-    }
-    try {
-      const file = new File([blob], `Estado_Cuenta_${customer.name}.png`, { type: 'image/png' });
-      if (navigator.canShare({ files: [file] })) {
+    // Si Web Share con archivos está disponible, úsala como primera opción
+    if (blob && canShareFiles()) {
+      try {
+        const cleanName = customer.name.replace(/[^a-zA-Z0-9]/g, '_');
+        const file = new File([blob], `Cuenta_${cleanName}.png`, { type: 'image/png' });
         await navigator.share({
           files: [file],
-          title: `Estado de Cuenta - ${customer.name}`,
-          text: whatsAppMessage
+          title: `Cuenta de cobro – ${customer.name}`,
         });
         return;
+      } catch (e) {
+        if (e?.name === 'AbortError') return;
       }
-      handleDownloadImage();
-    } catch (e) {
-      if (e?.name !== 'AbortError') console.warn('Share API falló:', e);
     }
+    // Fallback: descarga el archivo
+    handleDownloadImage();
   };
 
   return (
@@ -882,28 +927,35 @@ _(O en efectivo en la caja registradora de la tienda)_
           borderTop: '1px solid var(--border-subtle)',
           flexShrink: 0
         }}>
-          {/* Botón Principal: Compartir / Enviar por WhatsApp */}
+          {/* Botón Principal: Enviar imagen por WhatsApp */}
           <button
             type="button"
             className="btn"
             onClick={handleShareImageOrWhatsApp}
+            disabled={isGeneratingImg || !previewImageUri}
             style={{
               width: '100%',
-              background: '#25D366',
+              background: isGeneratingImg || !previewImageUri ? '#a7f3d0' : '#25D366',
               color: '#ffffff',
               fontWeight: 800,
               fontSize: '0.94rem',
               padding: '11px',
               borderRadius: 'var(--radius-md)',
-              boxShadow: '0 4px 14px rgba(37, 211, 102, 0.35)',
+              boxShadow: isGeneratingImg || !previewImageUri ? 'none' : '0 4px 14px rgba(37, 211, 102, 0.35)',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              gap: '8px'
+              gap: '8px',
+              cursor: isGeneratingImg || !previewImageUri ? 'not-allowed' : 'pointer',
+              transition: 'background 0.2s'
             }}
           >
             <MessageSquare size={18} />
-            <span>Abrir Chat de WhatsApp (imagen copiada)</span>
+            <span>
+              {isGeneratingImg
+                ? 'Preparando imagen…'
+                : '📸 Enviar imagen por WhatsApp'}
+            </span>
           </button>
 
           {/* Botones Secundarios */}
@@ -911,8 +963,8 @@ _(O en efectivo en la caja registradora de la tienda)_
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={handleNativeShareImage}
-              disabled={isGeneratingImg}
+              onClick={handleDownloadImage}
+              disabled={isGeneratingImg || !previewImageUri}
               style={{
                 flex: 1,
                 fontSize: '0.8rem',
@@ -922,10 +974,10 @@ _(O en efectivo en la caja registradora de la tienda)_
                 gap: '5px',
                 padding: '8px'
               }}
-              title="Abrir el menú de compartir del dispositivo (ideal en celular para adjuntar la foto)"
+              title="Descargar la imagen PNG en este dispositivo"
             >
-              <Share2 size={14} />
-              {isGeneratingImg ? 'Generando imagen…' : 'Compartir Imagen'}
+              <Download size={14} />
+              {isGeneratingImg ? 'Generando…' : 'Descargar PNG'}
             </button>
 
             <button
